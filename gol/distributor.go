@@ -31,32 +31,6 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 	return neighbours
 }
 
-func calculateNextState(p Params, world [][]byte) [][]byte {
-	newWorld := make([][]byte, p.ImageHeight)
-	for i := range newWorld {
-		newWorld[i] = make([]byte, p.ImageWidth)
-	}
-	for y := 0; y < p.ImageHeight; y++ {
-		for x := 0; x < p.ImageWidth; x++ {
-			neighbours := calculateNeighbours(p, x, y, world)
-			if world[y][x] == alive {
-				if neighbours == 2 || neighbours == 3 {
-					newWorld[y][x] = alive
-				} else {
-					newWorld[y][x] = dead
-				}
-			} else {
-				if neighbours == 3 {
-					newWorld[y][x] = alive
-				} else {
-					newWorld[y][x] = dead
-				}
-			}
-		}
-	}
-	return newWorld
-}
-
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
