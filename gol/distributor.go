@@ -49,7 +49,7 @@ func distributor(p Params, c distributorChannels) {
 		}
 	}
 	// TODO: For all initially alive cells send a CellFlipped Event.
-
+	
 	turn := 0
 
 	// TODO: Execute all turns of the Game of Life.
