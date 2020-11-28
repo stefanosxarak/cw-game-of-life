@@ -12,7 +12,6 @@ type Params struct {
 func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 
 	ioCommand := make(chan ioCommand)
-	ioIdle := make(chan bool)
 	ioFilename := make(chan string)
 	ioIdle := make(chan bool)
 	ioOutput := make(chan uint8)
