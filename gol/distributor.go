@@ -8,9 +8,9 @@ type distributorChannels struct {
 	events     chan<- Event
 	ioCommand  chan<- ioCommand
 	ioIdle     <-chan bool
-	iofilename chan<- string
-	iooutput   chan<- uint8
-	ioinput    <-chan uint8
+	ioFilename chan<- string
+	ioOutput   chan<- uint8
+	ioInput    <-chan uint8
 }
 
 type cell struct {
@@ -40,6 +40,8 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
+	c.ioCommand <- ioInput
+	<-c.ioInput
 
 	// TODO: Create a 2D slice to store the world.
 	world := make([][]byte, p.ImageHeight)
@@ -57,11 +59,10 @@ func distributor(p Params, c distributorChannels) {
 	}
 	// TODO: For all initially alive cells send a CellFlipped Event.
 	turn := 0
-	c.events <- CellFlipped{}
-	c.events <- AliveCellsCount{turn, len(aliveCells)}
+	// c.events <- CellFlipped{0,x,y}
 
 	// TODO: Execute all turns of the Game of Life.
-	for t := 0; t < p.Turns; t++ {
+	for turn = 0; turn < p.Turns; turn++ {
 		for y := 0; y < p.ImageHeight; y++ {
 			for x := 0; x < p.ImageWidth; x++ {
 				neighbours := calculateNeighbours(p, x, y, world)
@@ -80,10 +81,10 @@ func distributor(p Params, c distributorChannels) {
 				}
 			}
 		}
-		//alivecellscount
-		//TurnComplete
+		c.events <- AliveCellsCount{turn, len(aliveCells)}
+		c.events <- TurnComplete{turn}
 	}
-	//FinalTurnComplete
+	// c.events <- FinalTurnComplete{turn,world}
 
 	// TODO: Send correct Events when required, e.g. CellFlipped, TurnComplete and FinalTurnComplete.
 	//		 See event.go for a list of all events.
@@ -91,13 +92,10 @@ func distributor(p Params, c distributorChannels) {
 	// Make sure that the Io has finished any output before exiting.
 
 	filename := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-	c.iofilename <- filename
+	c.ioFilename <- filename
 
 	//TODO na ftiaksoume to input kai to output
-	// input := make([]byte, p.ImageWidth)
-	// output := make([]byte, p.ImageWidth)
-	// input <- c.ioinput
-	// c.iooutput <- io
+
 	// ImageOutputComplete
 
 	c.ioCommand <- ioCheckIdle
