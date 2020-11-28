@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"uk.ac.bris.cs/gameoflife/util"
 	"fmt"
 )
 
@@ -40,8 +41,10 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
+	fmt.Println("input check 1")
 	c.ioCommand <- ioInput
 	<-c.ioInput
+	fmt.Println("input check 2")
 
 	// TODO: Create a 2D slice to store the world.
 	world := make([][]byte, p.ImageHeight)
@@ -59,7 +62,9 @@ func distributor(p Params, c distributorChannels) {
 	}
 	// TODO: For all initially alive cells send a CellFlipped Event.
 	turn := 0
-	// c.events <- CellFlipped{0,x,y}
+	// var cells := cell
+	 
+	c.events <- CellFlipped{0,util.Cell{X: 0, Y: 0}}
 
 	// TODO: Execute all turns of the Game of Life.
 	for turn = 0; turn < p.Turns; turn++ {
@@ -90,9 +95,12 @@ func distributor(p Params, c distributorChannels) {
 	//		 See event.go for a list of all events.
 
 	// Make sure that the Io has finished any output before exiting.
+	fmt.Println("filename check 1")
 
-	filename := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-	c.ioFilename <- filename
+	// filename := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
+	// c.ioFilename <- filename
+	fmt.Println("filename check 2")
+
 
 	//TODO na ftiaksoume to input kai to output
 
