@@ -1,8 +1,9 @@
 package gol
 
 import (
-	"uk.ac.bris.cs/gameoflife/util"
 	"fmt"
+
+	"uk.ac.bris.cs/gameoflife/util"
 )
 
 type distributorChannels struct {
@@ -39,18 +40,33 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 	return neighbours
 }
 
-// distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels) {
-	fmt.Println("input check 1")
-	c.ioCommand <- ioInput
-	<-c.ioInput
-	fmt.Println("input check 2")
-
-	// TODO: Create a 2D slice to store the world.
-	world := make([][]byte, p.ImageHeight)
-	for i := range world {
-		world[i] = make([]byte, p.ImageWidth)
+func calculateNextState(p Params, world [][]byte) [][]byte {
+	newWorld := make([][]byte, p.ImageHeight)
+	for i := range newWorld {
+		newWorld[i] = make([]byte, p.ImageWidth)
 	}
+	for y := 0; y < p.ImageHeight; y++ {
+		for x := 0; x < p.ImageWidth; x++ {
+			neighbours := calculateNeighbours(p, x, y, world)
+			if world[y][x] == alive {
+				if neighbours == 2 || neighbours == 3 {
+					newWorld[y][x] = alive
+				} else {
+					newWorld[y][x] = dead
+				}
+			} else {
+				if neighbours == 3 {
+					newWorld[y][x] = alive
+				} else {
+					newWorld[y][x] = dead
+				}
+			}
+		}
+	}
+	return newWorld
+}
+
+func calculateAliveCells(p Params, world [][]byte) []cell {
 	aliveCells := []cell{}
 
 	for y := 0; y < p.ImageHeight; y++ {
@@ -60,51 +76,57 @@ func distributor(p Params, c distributorChannels) {
 			}
 		}
 	}
+
+	return aliveCells
+}
+
+// distributor divides the work between workers and interacts with other goroutines.
+func distributor(p Params, c distributorChannels) {
+
+	fmt.Println("filename check 1")
+	//imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
+	//imageName := fmt.Sprintf("images/%vx%v.pgm", p.ImageWidth, p.ImageHeight)
+	// imageName := fmt.Sprintf("%vx%v", p.ImageWidth, p.ImageHeight)
+
+	// data, ioError := ioutil.ReadFile("images/" + filename + ".pgm")
+	// c.ioFilename <- imageName
+	fmt.Println("filename check 2")
+
+	fmt.Println("input check 1")
+	c.ioCommand <- ioInput
+	<-c.ioInput
+	fmt.Println("input check 2")
+
+	// TODO: Create a 2D slice to store the world.
+	newworld := make([][]byte, p.ImageHeight)
+	for i := range newworld {
+		newworld[i] = make([]byte, p.ImageWidth)
+	}
+
+	aliveCells := calculateAliveCells(p, newworld)
 	// TODO: For all initially alive cells send a CellFlipped Event.
 	turn := 0
-	// var cells := cell
-	 
-	c.events <- CellFlipped{0,util.Cell{X: 0, Y: 0}}
-
+	// var cells := util.Cell
+	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
+	world := newworld
 	// TODO: Execute all turns of the Game of Life.
 	for turn = 0; turn < p.Turns; turn++ {
-		for y := 0; y < p.ImageHeight; y++ {
-			for x := 0; x < p.ImageWidth; x++ {
-				neighbours := calculateNeighbours(p, x, y, world)
-				if world[y][x] == alive {
-					if neighbours == 2 || neighbours == 3 {
-						world[y][x] = alive
-					} else {
-						world[y][x] = dead
-					}
-				} else {
-					if neighbours == 3 {
-						world[y][x] = alive
-					} else {
-						world[y][x] = dead
-					}
-				}
-			}
-		}
+		world = calculateNextState(p, world)
+		aliveCells = calculateAliveCells(p, world)
 		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 	}
+	// c.ioOutput <- world
 	// c.events <- FinalTurnComplete{turn,world}
 
 	// TODO: Send correct Events when required, e.g. CellFlipped, TurnComplete and FinalTurnComplete.
 	//		 See event.go for a list of all events.
 
 	// Make sure that the Io has finished any output before exiting.
-	fmt.Println("filename check 1")
 
-	// filename := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-	// c.ioFilename <- filename
-	fmt.Println("filename check 2")
+	//TODO na ftiaksoume to output
 
-
-	//TODO na ftiaksoume to input kai to output
-
-	// ImageOutputComplete
+	// c.events <- ImageOutputComplete{turn,imageName}
 
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
