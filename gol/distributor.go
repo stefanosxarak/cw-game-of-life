@@ -15,10 +15,6 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
-type cell struct {
-	x, y int
-}
-
 const alive = 255
 const dead = 0
 
@@ -80,55 +76,86 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return aliveCells
 }
 
-// func worker(p Params ){}
+// creates a empty grid for the current state of the world
+func makeWorld(height int, width int, c distributorChannels) [][]uint8 {
+	world := make([][]uint8, height)
+	for row := 0; row < height; row++ {
+		world[row] = make([]uint8, width)
+		for cell := 0; cell < width; cell++ {
+			world[row][cell] = <-c.ioInput
+		}
+	}
+	return world
+}
 
+//A 2D slice to store the updated world.
+func makeNewWorld(height int, width int) [][]uint8 {
+	newWorld := make([][]uint8, height)
+	for row := 0; row < height; row++ {
+		newWorld[row] = make([]uint8, width)
+	}
+	return newWorld
+}
+
+// func workers(p Params ){}
+
+func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
+	c.ioCommand <- ioOutput
+	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
+	c.ioFilename <- outputFilename
+	for row := 0; row < p.ImageHeight; row++ {
+		for cell := 0; cell < p.ImageWidth; cell++ {
+			c.ioOutput <- world[row][cell]
+		}
+	}
+}
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
+	//Input data
 	c.ioCommand <- ioInput
-
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
 	c.ioFilename <- imageName
 
-	// TODO: Create a 2D slice to store the world.
-	newworld := make([][]byte, p.ImageHeight)
-	for i := range newworld {
-		newworld[i] = make([]byte, p.ImageWidth)
-	}
+	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
+	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-	for y := 0; y < 16; y++ {
-		for x := 0; x < 16; x++ {
-			<-c.ioInput
-		}
-	}
+	// done := make(chan bool)
+	// ticker := time.NewTicker(2000 * time.Millisecond)
 
-	aliveCells := calculateAliveCells(p, newworld)
+	aliveCells := calculateAliveCells(p, newWorld)
 	// TODO: For all initially alive cells send a CellFlipped Event.
 	turn := 0
 	var cells []util.Cell
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
-	world := newworld
+	world = newWorld
 	// TODO: Execute all turns of the Game of Life.
 	for turn = 0; turn < p.Turns; turn++ {
 		world = calculateNextState(p, world)
 		aliveCells = calculateAliveCells(p, world)
+		// timer := time.After
 		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
+		cells = append(aliveCells)
 	}
-	cells = append(aliveCells)
-	c.events <- FinalTurnComplete{turn, cells}
-	fmt.Println("output check 1")
-	c.ioCommand <- ioOutput
 
-	// go func(){
-	// 	for{
-	// 		select{
-	// 		case <-ticker.C:
-	// 			c.events <- AliveCellsCount{turn,0}
+	//saves the result to a file
+	saveWorld(c, p, turn, world)
+
+
+	// go func() {
+	// 	for {
+	// 		select {
+	// 		case t := <-ticker.C:
+	// 			c.events <- AliveCellsCount{turn, 0}
+	// 			fmt.Println("Tick at", t)
 	// 		case <-done:
 	// 			return
 	// 		}
 	// 	}
-	// }
+	// }()
+
+	c.events <- FinalTurnComplete{turn, cells}
+
 
 	// Make sure that the Io has finished any output before exiting.
 
