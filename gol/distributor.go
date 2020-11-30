@@ -66,13 +66,13 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 	return newWorld
 }
 
-func calculateAliveCells(p Params, world [][]byte) []cell {
-	aliveCells := []cell{}
+func calculateAliveCells(p Params, world [][]byte) []util.Cell {
+	aliveCells := []util.Cell{}
 
 	for y := 0; y < p.ImageHeight; y++ {
 		for x := 0; x < p.ImageWidth; x++ {
 			if world[y][x] == alive {
-				aliveCells = append(aliveCells, cell{x: x, y: y})
+				aliveCells = append(aliveCells, util.Cell{X: x, Y: y})
 			}
 		}
 	}
@@ -80,22 +80,14 @@ func calculateAliveCells(p Params, world [][]byte) []cell {
 	return aliveCells
 }
 
+// func worker(p Params ){}
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
-
-	fmt.Println("filename check 1")
-	//imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-	//imageName := fmt.Sprintf("images/%vx%v.pgm", p.ImageWidth, p.ImageHeight)
-	// imageName := fmt.Sprintf("%vx%v", p.ImageWidth, p.ImageHeight)
-
-	// data, ioError := ioutil.ReadFile("images/" + filename + ".pgm")
-	// c.ioFilename <- imageName
-	fmt.Println("filename check 2")
-
-	fmt.Println("input check 1")
 	c.ioCommand <- ioInput
-	<-c.ioInput
-	fmt.Println("input check 2")
+
+	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
+	c.ioFilename <- imageName
 
 	// TODO: Create a 2D slice to store the world.
 	newworld := make([][]byte, p.ImageHeight)
@@ -103,10 +95,16 @@ func distributor(p Params, c distributorChannels) {
 		newworld[i] = make([]byte, p.ImageWidth)
 	}
 
+	for y := 0; y < 16; y++ {
+		for x := 0; x < 16; x++ {
+			<-c.ioInput
+		}
+	}
+
 	aliveCells := calculateAliveCells(p, newworld)
 	// TODO: For all initially alive cells send a CellFlipped Event.
 	turn := 0
-	// var cells := util.Cell
+	var cells []util.Cell
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 	world := newworld
 	// TODO: Execute all turns of the Game of Life.
@@ -116,17 +114,25 @@ func distributor(p Params, c distributorChannels) {
 		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 	}
-	// c.ioOutput <- world
-	// c.events <- FinalTurnComplete{turn,world}
+	cells = append(aliveCells)
+	c.events <- FinalTurnComplete{turn, cells}
+	fmt.Println("output check 1")
+	c.ioCommand <- ioOutput
 
-	// TODO: Send correct Events when required, e.g. CellFlipped, TurnComplete and FinalTurnComplete.
-	//		 See event.go for a list of all events.
+	// go func(){
+	// 	for{
+	// 		select{
+	// 		case <-ticker.C:
+	// 			c.events <- AliveCellsCount{turn,0}
+	// 		case <-done:
+	// 			return
+	// 		}
+	// 	}
+	// }
 
 	// Make sure that the Io has finished any output before exiting.
 
-	//TODO na ftiaksoume to output
-
-	// c.events <- ImageOutputComplete{turn,imageName}
+	c.events <- ImageOutputComplete{turn, imageName}
 
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
