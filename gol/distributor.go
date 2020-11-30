@@ -109,6 +109,7 @@ func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 		}
 	}
 }
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 	//Input data
@@ -123,19 +124,21 @@ func distributor(p Params, c distributorChannels) {
 	// ticker := time.NewTicker(2000 * time.Millisecond)
 
 	aliveCells := calculateAliveCells(p, newWorld)
-	// TODO: For all initially alive cells send a CellFlipped Event.
-	turn := 0
-	var cells []util.Cell
+	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
-	world = newWorld
-	// TODO: Execute all turns of the Game of Life.
+
+	//Game of Life.
+	turn := 0
 	for turn = 0; turn < p.Turns; turn++ {
-		world = calculateNextState(p, world)
+
+		world = newWorld
+		newWorld = calculateNextState(p, world)
 		aliveCells = calculateAliveCells(p, world)
-		// timer := time.After
+
+
+
 		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
-		cells = append(aliveCells)
 	}
 
 	//saves the result to a file
@@ -154,7 +157,7 @@ func distributor(p Params, c distributorChannels) {
 	// 	}
 	// }()
 
-	c.events <- FinalTurnComplete{turn, cells}
+	c.events <- FinalTurnComplete{turn, calculateAliveCells(p,world)}
 
 
 	// Make sure that the Io has finished any output before exiting.
