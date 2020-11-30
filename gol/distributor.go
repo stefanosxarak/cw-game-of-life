@@ -76,7 +76,7 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return aliveCells
 }
 
-// creates a empty grid for the current state of the world
+// creates a grid for the current state of the world
 func makeWorld(height int, width int, c distributorChannels) [][]uint8 {
 	world := make([][]uint8, height)
 	for row := 0; row < height; row++ {
@@ -130,10 +130,13 @@ func distributor(p Params, c distributorChannels) {
 	//Game of Life.
 	turn := 0
 	for turn = 0; turn < p.Turns; turn++ {
-
-		world = newWorld
 		newWorld = calculateNextState(p, world)
 		aliveCells = calculateAliveCells(p, world)
+
+		//we add the newly updated world to the grid we had made
+		world = newWorld
+		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
+
 
 
 
