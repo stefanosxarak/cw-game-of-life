@@ -99,6 +99,8 @@ func makeNewWorld(height int, width int) [][]uint8 {
 
 // func workers(p Params ){}
 
+//func workers (c distributorChannels, p Params,  cell int, thread int, workerChannel chan<- ) chan to return worker {}
+
 func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
 	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
