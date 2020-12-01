@@ -21,7 +21,7 @@ const dead = 0
 func mod(x, m int) int {
 	return (x + m) % m
 }
-
+//calculateNeighbors takes the current state of the world and completes one evolution of the world. It then returns the result
 func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 	neighbours := 0
 	for i := -1; i <= 1; i++ {
@@ -61,7 +61,7 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 	}
 	return newWorld
 }
-
+//calculateAliveCells function takes the world as input and returns the (x, y) coordinates of all the cells that are alive.
 func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	aliveCells := []util.Cell{}
 
