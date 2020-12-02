@@ -2,7 +2,6 @@ package gol
 
 import (
 	"fmt"
-	"time"
 
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -14,6 +13,7 @@ type distributorChannels struct {
 	ioFilename chan<- string
 	ioOutput   chan<- uint8
 	ioInput    <-chan uint8
+	keyPresses <-chan rune
 }
 
 const alive = 255
@@ -22,6 +22,7 @@ const dead = 0
 func mod(x, m int) int {
 	return (x + m) % m
 }
+
 //calculateNeighbors takes the current state of the world and completes one evolution of the world. It then returns the result
 func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 	neighbours := 0
@@ -63,6 +64,7 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 	}
 	return newWorld
 }
+
 //calculateAliveCells function takes the world as input and returns the (x, y) coordinates of all the cells that are alive.
 func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	aliveCells := []util.Cell{}
@@ -99,7 +101,11 @@ func makeNewWorld(height int, width int) [][]uint8 {
 	return newWorld
 }
 
-// func workers(p Params ){}
+func workers(numOfWorkers int, p Params) {
+	for i := 0; i < numOfWorkers; i++ {
+
+	}
+}
 
 func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
@@ -124,8 +130,8 @@ func distributor(p Params, c distributorChannels) {
 	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 	//ticker variables
-	ticker := time.NewTicker(2 * time.Second)
-	done := make(chan bool)
+	// ticker := time.NewTicker(2 * time.Second)
+	// done := make(chan bool)
 
 	// A variable to store current alive cells
 	aliveCells := calculateAliveCells(p, newWorld)
@@ -134,8 +140,9 @@ func distributor(p Params, c distributorChannels) {
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
 	//Game of Life.
+	quit := false
 	turn := 0
-	for turn = 0; turn < p.Turns; turn++ {
+	for turn = 0; turn < p.Turns && quit == false; turn++ {
 		newWorld = calculateNextState(p, world)
 		aliveCells = calculateAliveCells(p, world)
 
@@ -143,24 +150,47 @@ func distributor(p Params, c distributorChannels) {
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-		//ticker function
-		go func() {
-			for {
-				select {
-				case t := <-ticker.C:
-					c.events <- AliveCellsCount{turn, len(aliveCells)}
-					fmt.Println("Tick at", t)
-				case <-done:
-					return
+
+		//s to save, q to quit, p to pause
+		select {
+		case x := <-c.keyPresses:
+			if x == 's' {
+				saveWorld(c, p, turn, world)
+			} else if x == 'q' {
+				quit = true
+				c.events <- StateChange{turn, Quitting}
+			} else if x == 'p' {
+				c.events <- StateChange{turn, Paused}
+				fmt.Println("The current turn is being processed.")
+				 x = ' '
+				// fmt.Scanln(&x)
+				if x == 'p' {
+					c.events <- StateChange{turn, Executing}
 				}
 			}
-		}()
 
-		// c.events <- AliveCellsCount{turn, len(aliveCells)}
+		default:
+			break
+		}
+
+		//ticker function
+		// go func() {
+		// 	for {
+		// 		select {
+		// 		case t := <-ticker.C:
+		// 			c.events <- AliveCellsCount{turn, len(aliveCells)}
+		// 			fmt.Println("Tick at", t)
+		// 		case <-done:
+		// 			return
+		// 		}
+		// 	}
+		// }()
+
+		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 	}
-	ticker.Stop()
-	done <- true
+	// ticker.Stop()
+	// done <- true
 
 	//saves the result to a file
 	saveWorld(c, p, turn, world)
