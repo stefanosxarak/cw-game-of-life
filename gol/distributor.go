@@ -2,6 +2,7 @@ package gol
 
 import (
 	"fmt"
+	"time"
 
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -36,6 +37,7 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 	return neighbours
 }
 
+//progress to next state
 func calculateNextState(p Params, world [][]byte) [][]byte {
 	newWorld := make([][]byte, p.ImageHeight)
 	for i := range newWorld {
@@ -117,13 +119,17 @@ func distributor(p Params, c distributorChannels) {
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
 	c.ioFilename <- imageName
 
+	//Initialization
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
 	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-	// done := make(chan bool)
-	// ticker := time.NewTicker(2000 * time.Millisecond)
+	//ticker variables
+	ticker := time.NewTicker(2 * time.Second)
+	done := make(chan bool)
 
+	// A variable to store current alive cells
 	aliveCells := calculateAliveCells(p, newWorld)
+
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
@@ -137,36 +143,32 @@ func distributor(p Params, c distributorChannels) {
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
+		//ticker function
+		go func() {
+			for {
+				select {
+				case t := <-ticker.C:
+					c.events <- AliveCellsCount{turn, len(aliveCells)}
+					fmt.Println("Tick at", t)
+				case <-done:
+					return
+				}
+			}
+		}()
 
-
-
-		c.events <- AliveCellsCount{turn, len(aliveCells)}
+		// c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 	}
+	ticker.Stop()
+	done <- true
 
 	//saves the result to a file
 	saveWorld(c, p, turn, world)
 
-
-	// go func() {
-	// 	for {
-	// 		select {
-	// 		case t := <-ticker.C:
-	// 			c.events <- AliveCellsCount{turn, 0}
-	// 			fmt.Println("Tick at", t)
-	// 		case <-done:
-	// 			return
-	// 		}
-	// 	}
-	// }()
-
-	c.events <- FinalTurnComplete{turn, calculateAliveCells(p,world)}
-
+	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
 
 	// Make sure that the Io has finished any output before exiting.
-
 	c.events <- ImageOutputComplete{turn, imageName}
-
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 
