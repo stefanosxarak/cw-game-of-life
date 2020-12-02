@@ -101,6 +101,7 @@ func makeNewWorld(height int, width int) [][]uint8 {
 	return newWorld
 }
 
+//create workers
 func workers(numOfWorkers int, p Params) {
 	for i := 0; i < numOfWorkers; i++ {
 
@@ -116,6 +117,18 @@ func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 			c.ioOutput <- world[row][cell]
 		}
 	}
+}
+
+// pause the game
+func pause(c distributorChannels, turn int, x rune){
+	c.events <- StateChange{turn, Paused}
+	fmt.Println("The current turn is being processed.")
+	x = ' '
+	for x != 'p' {
+		x = <-c.keyPresses
+	}
+	fmt.Println("Continuing")
+	c.events <- StateChange{turn, Executing}
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -150,7 +163,6 @@ func distributor(p Params, c distributorChannels) {
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-
 		//s to save, q to quit, p to pause
 		select {
 		case x := <-c.keyPresses:
@@ -160,15 +172,8 @@ func distributor(p Params, c distributorChannels) {
 				quit = true
 				c.events <- StateChange{turn, Quitting}
 			} else if x == 'p' {
-				c.events <- StateChange{turn, Paused}
-				fmt.Println("The current turn is being processed.")
-				 x = ' '
-				// fmt.Scanln(&x)
-				if x == 'p' {
-					c.events <- StateChange{turn, Executing}
-				}
+				pause(c, turn, x)
 			}
-
 		default:
 			break
 		}
