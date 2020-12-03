@@ -2,6 +2,8 @@ package gol
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -15,12 +17,28 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 	keyPresses <-chan rune
 }
+//wc= worker channels
+type workerChannels struct {
+	mutex sync.Mutex
+	syncChan []chan int
+}
+type errorString struct {
+	s string
+}
 
 const alive = 255
 const dead = 0
 
 func mod(x, m int) int {
 	return (x + m) % m
+}
+
+//error handling
+func (e *errorString) Error() string {
+	return e.s
+}
+func New(text string) error {
+	return &errorString{text}
 }
 
 //calculateNeighbors takes the current state of the world and completes one evolution of the world. It then returns the result
@@ -101,12 +119,14 @@ func makeNewWorld(height int, width int) [][]uint8 {
 	return newWorld
 }
 
-//create workers
-func workers(numOfWorkers int, p Params) {
+// workers
+func createWorkers(numOfWorkers int, rowsPerWorker int,wc workerChannels) {
 	for i := 0; i < numOfWorkers; i++ {
-
+		wc.syncChan[i] = make(chan int)
+		// workerRows := rowsPerWorker
 	}
 }
+func runWorkers() {}
 
 func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
@@ -120,7 +140,7 @@ func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 }
 
 // pause the game
-func pause(c distributorChannels, turn int, x rune){
+func pause(c distributorChannels, turn int, x rune) {
 	c.events <- StateChange{turn, Paused}
 	fmt.Println("The current turn is being processed.")
 	x = ' '
@@ -129,6 +149,43 @@ func pause(c distributorChannels, turn int, x rune){
 	}
 	fmt.Println("Continuing")
 	c.events <- StateChange{turn, Executing}
+}
+
+// Button control
+func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
+	//s to save, q to quit, p to pause/unpause
+	select {
+	case x := <-c.keyPresses:
+		if x == 's' {
+			saveWorld(c, p, turn, world)
+		} else if x == 'q' {
+			quit = true
+			c.events <- StateChange{turn, Quitting}
+		} else if x == 'p' {
+			pause(c, turn, x)
+		}
+	default:
+		break
+	}
+	return quit
+}
+
+// ticker function
+func (m *workerChannels) ticker(c distributorChannels, turn int, aliveCells []util.Cell, done <-chan bool) {
+	ticker := time.NewTicker(2 * time.Second)
+	done = make(chan bool)
+
+	for {
+		select {
+		case t := <-ticker.C:
+			m.mutex.Lock()
+			c.events <- AliveCellsCount{turn, len(aliveCells)}
+			fmt.Println("Tick at", t)
+			m.mutex.Unlock()
+		case <-done:
+			return
+		}
+	}
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -142,6 +199,12 @@ func distributor(p Params, c distributorChannels) {
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
 	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
+	rowsPerWorker := p.ImageHeight / p.Threads
+
+	//worker channel struct
+	wc := workerChannels{}
+	wc.syncChan = make([]chan int, p.Threads)
+
 	//ticker variables
 	// ticker := time.NewTicker(2 * time.Second)
 	// done := make(chan bool)
@@ -152,45 +215,27 @@ func distributor(p Params, c distributorChannels) {
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
+	createWorkers(p.Threads, rowsPerWorker,wc)
+
 	//Game of Life.
 	quit := false
 	turn := 0
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
+		for i := 0; i < p.Threads; i++ {
+			x := <-wc.syncChan[i]
+			if x != turn {
+				New("Out of sync")
+			}
+		}
+		keyControl(c, p, turn, quit, world)
 		newWorld = calculateNextState(p, world)
 		aliveCells = calculateAliveCells(p, world)
-
+		c.events <- CellFlipped{turn + 1, util.Cell{X: p.ImageWidth, Y: p.ImageHeight}}
 		//we add the newly updated world to the grid we had made
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-		//s to save, q to quit, p to pause
-		select {
-		case x := <-c.keyPresses:
-			if x == 's' {
-				saveWorld(c, p, turn, world)
-			} else if x == 'q' {
-				quit = true
-				c.events <- StateChange{turn, Quitting}
-			} else if x == 'p' {
-				pause(c, turn, x)
-			}
-		default:
-			break
-		}
-
-		//ticker function
-		// go func() {
-		// 	for {
-		// 		select {
-		// 		case t := <-ticker.C:
-		// 			c.events <- AliveCellsCount{turn, len(aliveCells)}
-		// 			fmt.Println("Tick at", t)
-		// 		case <-done:
-		// 			return
-		// 		}
-		// 	}
-		// }()
-
+		// go ticker(c, turn, aliveCells, done)
 		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 	}
@@ -199,14 +244,12 @@ func distributor(p Params, c distributorChannels) {
 
 	//saves the result to a file
 	saveWorld(c, p, turn, world)
-
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
 
 	// Make sure that the Io has finished any output before exiting.
 	c.events <- ImageOutputComplete{turn, imageName}
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
-
 	c.events <- StateChange{turn, Quitting}
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
