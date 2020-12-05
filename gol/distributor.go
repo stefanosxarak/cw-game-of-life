@@ -2,7 +2,6 @@ package gol
 
 import (
 	"fmt"
-	"time"
 
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -52,7 +51,7 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 	return neighbours
 }
 
-//progress to next state
+//progress to next state and update CellFlipped event
 func calculateNextState(p Params, turn int, c distributorChannels, world [][]byte) [][]byte {
 	newWorld := make([][]byte, p.ImageHeight)
 	for i := range newWorld {
@@ -151,7 +150,7 @@ func pause(c distributorChannels, turn int, x rune) {
 
 // Button control
 func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
-	//s to save, q to quit, p to pause/unpause
+	//s to save, q to quit, p to pause/unpause, k to stop all comms with server
 	select {
 	case x := <-c.keyPresses:
 		if x == 's' {
@@ -161,6 +160,10 @@ func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]
 			c.events <- StateChange{turn, Quitting}
 		} else if x == 'p' {
 			pause(c, turn, x)
+		} else if x == 'k' {
+
+		} else {
+			New("Wrong Key. Please press 's' to save, 'q' to quit, 'p' to pause/unpause, 'k' to close all server communications ")
 		}
 	default:
 		break
@@ -168,24 +171,9 @@ func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]
 	return quit
 }
 
-// ticker function
-func ticker(c distributorChannels, turn int, aliveCells []util.Cell, done <-chan bool) {
-	ticker := time.NewTicker(2 * time.Second)
-	done = make(chan bool)
-
-	for {
-		select {
-		case t := <-ticker.C:
-			c.events <- AliveCellsCount{turn, len(aliveCells)}
-			fmt.Println("Tick at", t)
-		case <-done:
-			return
-		}
-	}
-}
-
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
+
 	//Input data
 	c.ioCommand <- ioInput
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
@@ -197,20 +185,21 @@ func distributor(p Params, c distributorChannels) {
 
 	// rowsPerWorker := p.ImageHeight / p.Threads
 
-
-	//ticker variables
-	// ticker := time.NewTicker(2 * time.Second)
-	// done := make(chan bool)
+	//ticker channels
+	t := TickerChans{}
+	t.done = make(chan bool)
+	t.turnChan = make(chan int)
 
 	// A variable to store current alive cells
-	aliveCells := calculateAliveCells(p, newWorld)
+	aliveCells := calculateAliveCells(p, world)
 
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
 	//Game of Life.
 	quit := false
-	turn := 0
+	var turn int
+	go t.ticker(c, aliveCells, t.done)
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
 
 		// wait for all workers to complete this turn
@@ -228,8 +217,6 @@ func distributor(p Params, c distributorChannels) {
 		quit = keyControl(c, p, turn, quit, world)
 		newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
-		// go ticker(c,turn, aliveCells, done)
-		
 
 		//update events
 		c.events <- AliveCellsCount{turn, len(aliveCells)}
@@ -238,13 +225,14 @@ func distributor(p Params, c distributorChannels) {
 		//we add the newly updated world to the grid we had made
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
+		t.turnChan <- turn
 	}
-	// ticker.Stop()
-	// done <- true
+	//terminate ticker
+	t.done <- true
 
 	//saves the result to a file
 	saveWorld(c, p, turn, world)
-	
+
 	// Make sure that the Io has finished any output before exiting.
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
 	c.events <- ImageOutputComplete{turn, imageName}
