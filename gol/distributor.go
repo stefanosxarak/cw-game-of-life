@@ -225,7 +225,7 @@ func distributor(p Params, c distributorChannels) {
 		// 	}
 		// }
 
-		keyControl(c, p, turn, quit, world)
+		quit = keyControl(c, p, turn, quit, world)
 		newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
 		// go ticker(c,turn, aliveCells, done)
