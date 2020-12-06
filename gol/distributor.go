@@ -2,7 +2,7 @@ package gol
 
 import (
 	"fmt"
-
+	"github.com/ChrisGora/semaphore"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -15,7 +15,10 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 	keyPresses <-chan rune
 }
-
+type worker struct {
+	work     semaphore.Semaphore
+	space    semaphore.Semaphore
+}
 //error struct
 type errorString struct {
 	s string
@@ -116,14 +119,36 @@ func makeNewWorld(height int, width int) [][]uint8 {
 	return newWorld
 }
 
-// workers
-func createWorkers(numOfWorkers int, rowsPerWorker int) {
-	for i := 0; i < numOfWorkers; i++ {
-		// workerRows := rowsPerWorker
+// worker functions
+func (w *worker)createWorkers(p Params,)[]worker {
+	rowsPerWorker := p.ImageHeight / p.Threads
+	remaining := p.ImageHeight % p.Threads
+	workers := make([]worker, p.Threads)
+	for i := 0; i < p.Threads; i++ {
+		workers[i] = worker{}
+		workerRows := rowsPerWorker
+		//adds one of the remaining rows to a worker
+		if remaining > 0 {
+			workerRows++
+			remaining--
+		}
+		w.work = semaphore.Init(1, 1)
+		w.space = semaphore.Init(1, 0)
+
+	}
+	return workers
+}
+
+func (w *worker)runWorkers(p Params, c distributorChannels,) {
+	//TODO :
+	// 		implement the worker so that it succesfully makes an iteration
+	for turn := 0; ; turn++ {
+		w.work.Wait()
+		// workerSlice := calculateNextState(p, turn, c, newWorld)
+		w.space.Post()
 	}
 }
 
-func runWorkers() {}
 
 func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
@@ -183,7 +208,8 @@ func distributor(p Params, c distributorChannels) {
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
 	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-	// rowsPerWorker := p.ImageHeight / p.Threads
+	
+	// workers := createWorkers(p)
 
 	//ticker channels
 	t := TickerChans{}
@@ -192,7 +218,7 @@ func distributor(p Params, c distributorChannels) {
 
 	// A variable to store current alive cells
 	aliveCells := calculateAliveCells(p, world)
-
+	
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
