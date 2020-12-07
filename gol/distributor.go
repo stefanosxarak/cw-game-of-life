@@ -132,6 +132,7 @@ func (w *worker)createWorkers(p Params,)[]worker {
 			workerRows++
 			remaining--
 		}
+		//Semaphores with buffer size 1 so all workers keep up
 		w.work = semaphore.Init(1, 1)
 		w.space = semaphore.Init(1, 0)
 
@@ -139,12 +140,12 @@ func (w *worker)createWorkers(p Params,)[]worker {
 	return workers
 }
 
-func (w *worker)runWorkers(p Params, c distributorChannels,) {
+func (w *worker)runWorkers(p Params,c distributorChannels, world [][]uint8) {
 	//TODO :
-	// 		implement the worker so that it succesfully makes an iteration
+	// 		implement the worker and calculateNextState so that it succesfully makes an iteration of a round
 	for turn := 0; ; turn++ {
 		w.work.Wait()
-		// workerSlice := calculateNextState(p, turn, c, newWorld)
+		// workerSlice := calculateNextState(p, turn, c, world)
 		w.space.Post()
 	}
 }
@@ -208,8 +209,9 @@ func distributor(p Params, c distributorChannels) {
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
 	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-	
+	// Start making workers and running them
 	// workers := createWorkers(p)
+	// go runWorkers()
 
 	//ticker channels
 	t := TickerChans{}
@@ -228,29 +230,28 @@ func distributor(p Params, c distributorChannels) {
 	go t.ticker(c, aliveCells, t.done)
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
 
-		// wait for all workers to complete this turn
+		// Waiting all workers to finish each round  
 		// for _, w := range workers {
 		// 	w.space.Wait()
 		// }
 
-		// for i := 0; i < p.Threads; i++ {
-		// 	x := <-wc.syncChan[i]
-		// 	if x != turn {
-		// 		New("Out of sync")
-		// 	}
-		// }
-
+	
 		quit = keyControl(c, p, turn, quit, world)
 		newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
-
-		//update events
-		c.events <- AliveCellsCount{turn, len(aliveCells)}
-		c.events <- TurnComplete{turn}
-
 		//we add the newly updated world to the grid we had made
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
+
+		//update events
+		// c.events <- AliveCellsCount{turn, len(aliveCells)}
+		c.events <- TurnComplete{turn}
+
+		// Workers to start the next round if no q is pressed
+		// for i := 0; i < p.Threads && quit == false; i++ {
+		// 		workers[j].work.Post()
+		// }
+
 		t.turnChan <- turn
 	}
 	//terminate ticker
