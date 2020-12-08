@@ -1,9 +1,17 @@
 package gol
 
 import (
+	"bufio"
+	"flag"
 	"fmt"
-	"os"
+	"net"
 )
+
+//TODO:
+// Implement a basic controller which can tell the logic engine to evolve Game of Life for the number of turns
+// saveWorld
+// keyControl
+// Implement key k at keyControl
 
 type ClientChannels struct {
 	events     chan<- Event
@@ -15,11 +23,32 @@ type ClientChannels struct {
 	keyPresses <-chan rune
 }
 
-func handleError(err error) {
-	fmt.Println(err)
-	os.Exit(1)
-	// TODO: all
-	// Deal with an error event.
+func read(conn *net.Conn) {
+	// In a continuous loop, read a message from the server and display it.
+	for {
+		reader := bufio.NewReader(*conn)
+		msg, _ := reader.ReadString('\n')
+		fmt.Printf(msg)
+	}
+}
+
+func client(p Params, c ClientChannels) {
+
+	// Get the server address and port from the commandline arguments.
+	addrPtr := flag.String("ip", "3.85.4.37:8030", "IP:port string to connect to")
+	flag.Parse()
+	//TODO Try to connect to the server
+	conn, err := net.Dial("tcp", *addrPtr)
+	handleError(err)
+
+	// rpcConn, err := rpc.Dial("tcp", "127.0.0.1:8030")
+	handleError(err)
+
+	//fmt.Fprintln(conn, *addrPtr)
+	go read(&conn)
+
+	//TODO Start asynchronously reading and displaying messages
+	//TODO Start getting and sending user messages.
 }
 
 // func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {

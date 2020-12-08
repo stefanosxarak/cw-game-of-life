@@ -142,7 +142,7 @@ func (w *worker)createWorkers(p Params,)[]worker {
 
 func (w *worker)runWorkers(p Params,c distributorChannels, world [][]uint8) {
 	//TODO :
-	// 		implement the worker and calculateNextState so that it succesfully makes an iteration of a round
+	// Implement the worker and calculateNextState 
 	for turn := 0; ; turn++ {
 		w.work.Wait()
 		// workerSlice := calculateNextState(p, turn, c, world)
