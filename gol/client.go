@@ -35,7 +35,7 @@ func read(conn *net.Conn) {
 func client(p Params, c ClientChannels) {
 
 	// Get the server address and port from the commandline arguments.
-	addrPtr := flag.String("ip", "3.85.4.37:8030", "IP:port string to connect to")
+	addrPtr := flag.String("ip", "100.84.31.131:8030", "IP:port string to connect to")
 	flag.Parse()
 	//TODO Try to connect to the server
 	conn, err := net.Dial("tcp", *addrPtr)
