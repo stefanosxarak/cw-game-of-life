@@ -1,10 +1,8 @@
 package gol
 
 import (
-	"bufio"
-	"flag"
-	"fmt"
-	"net"
+	"net/rpc"
+	"uk.ac.bris.cs/gameoflife/util"
 )
 
 //TODO:
@@ -12,8 +10,9 @@ import (
 // saveWorld
 // keyControl
 // Implement key k at keyControl
+// stubs
 
-type ClientChannels struct {
+type ClientChans struct {
 	events     chan<- Event
 	ioCommand  chan<- ioCommand
 	ioIdle     <-chan bool
@@ -23,32 +22,25 @@ type ClientChannels struct {
 	keyPresses <-chan rune
 }
 
-func read(conn *net.Conn) {
-	// In a continuous loop, read a message from the server and display it.
-	for {
-		reader := bufio.NewReader(*conn)
-		msg, _ := reader.ReadString('\n')
-		fmt.Printf(msg)
+//error handling for server/client
+func handleError(err error) {
+	if err != nil {
+		panic(err)
 	}
 }
 
-func client(p Params, c ClientChannels) {
+func calculateAliveClient(p Params, world [][]byte) []util.Cell {
+	aliveCells := []util.Cell{}
 
-	// Get the server address and port from the commandline arguments.
-	addrPtr := flag.String("ip", "100.84.31.131:8030", "IP:port string to connect to")
-	flag.Parse()
-	//TODO Try to connect to the server
-	conn, err := net.Dial("tcp", *addrPtr)
-	handleError(err)
+	for y := 0; y < p.ImageHeight; y++ {
+		for x := 0; x < p.ImageWidth; x++ {
+			if world[y][x] == alive {
+				aliveCells = append(aliveCells, util.Cell{X: x, Y: y})
+			}
+		}
+	}
 
-	// rpcConn, err := rpc.Dial("tcp", "127.0.0.1:8030")
-	handleError(err)
-
-	//fmt.Fprintln(conn, *addrPtr)
-	go read(&conn)
-
-	//TODO Start asynchronously reading and displaying messages
-	//TODO Start getting and sending user messages.
+	return aliveCells
 }
 
 // func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
@@ -83,3 +75,37 @@ func client(p Params, c ClientChannels) {
 // 		}
 // 	}
 // }
+
+// func read(conn *net.Conn) {
+// 	// In a continuous loop, read a message from the server and display it.
+// 	for {
+// 		reader := bufio.NewReader(*conn)
+// 		msg, _ := reader.ReadString('\n')
+// 		fmt.Printf(msg)
+// 	}
+// }
+
+func clientRun(p Params, c ClientChans) {
+
+	// Establish contact with the server
+	srvrAddr := "localhost:8030"
+	server, err := rpc.Dial("tcp", srvrAddr)
+	handleError(err)
+	defer server.Close()
+	// err = server.Call(, args, reply)
+	handleError(err)
+
+
+	//fmt.Fprintln(conn, *addrPtr)
+	// go read(&conn)
+
+	// c.ioCommand <- ioCheckIdle
+	// <-c.ioIdle
+	// c.events <- StateChange{turn, Quitting}
+
+	// // Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+	// close(c.events)
+
+	//TODO Start asynchronously reading and displaying messages
+	//TODO Start getting and sending user messages.
+}

@@ -36,4 +36,11 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 		input:    ioInput,
 	}
 	go startIo(p, ioChannels)
+
+	// Input data
+	// c.ioCommand <- ioInput
+	// imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
+	// c.ioFilename <- imageName
+
+	// 	go clientRun(p ,clientChannels)
 }

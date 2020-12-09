@@ -31,7 +31,7 @@ func mod(x, m int) int {
 	return (x + m) % m
 }
 
-//error handling
+//error handling for distributor
 func (e *errorString) Error() string {
 	return e.s
 }
@@ -215,11 +215,11 @@ func distributor(p Params, c distributorChannels) {
 
 	//ticker channels
 	t := TickerChans{}
+	t.tick = make(chan bool)
 	t.done = make(chan bool)
-	t.turnChan = make(chan int)
-
+	
 	// A variable to store current alive cells
-	aliveCells := calculateAliveCells(p, world)
+	aliveCells := calculateAliveCells(p, newWorld)
 	
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
@@ -227,9 +227,9 @@ func distributor(p Params, c distributorChannels) {
 	//Game of Life.
 	quit := false
 	var turn int
-	go t.ticker(c, aliveCells, t.done)
+	
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
-
+		go t.ticker(t.done)
 		// Waiting all workers to finish each round  
 		// for _, w := range workers {
 		// 	w.space.Wait()
@@ -244,7 +244,7 @@ func distributor(p Params, c distributorChannels) {
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 		//update events
-		// c.events <- AliveCellsCount{turn, len(aliveCells)}
+		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 
 		// Workers to start the next round if no q is pressed
@@ -252,7 +252,6 @@ func distributor(p Params, c distributorChannels) {
 		// 		workers[j].work.Post()
 		// }
 
-		t.turnChan <- turn
 	}
 	//terminate ticker
 	t.done <- true
@@ -263,6 +262,7 @@ func distributor(p Params, c distributorChannels) {
 	// Make sure that the Io has finished any output before exiting.
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
 	c.events <- ImageOutputComplete{turn, imageName}
+
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 	c.events <- StateChange{turn, Quitting}

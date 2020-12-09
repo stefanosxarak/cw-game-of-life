@@ -6,16 +6,19 @@ import (
 	"net"
 	"net/rpc"
 )
+// Visit:
+// https://golang.org/pkg/net/rpc/ for info about how rpc works
+// https://golang.org/src/runtime/stubs.go for info about how stubs work or check the DS lab
 
+
+type ServerInterface struct {
+}
 
 //TODO:
+// Implement ServerInterface 
 // Sends a AliveCellsCount event to Client every 2 seconds
-
-func handleError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
+// Kill server
+// Pause/unpause server
 
 func main() {
 
@@ -26,14 +29,12 @@ func main() {
 	flag.Parse()
 
 	// register the interface
-	// rpc.Register(new(Server))
-	// listen for calls
-	active := true
-	for active {
-		ln, err := net.Listen("tcp", *portPtr)
-		handleError(err)
-		defer ln.Close()
-		// accept a listener
-		go rpc.Accept(ln)
-	}
+	server := new(ServerInterface)
+	rpc.Register(server)
+
+	// Awaiting connection
+	ln, err := net.Listen("tcp", *portPtr)
+	handleError(err)
+	defer ln.Close()
+	rpc.Accept(ln)
 }
