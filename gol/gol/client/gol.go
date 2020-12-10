@@ -1,8 +1,9 @@
 package gol
 
 import (
+	"net/rpc"
+
 	"uk.ac.bris.cs/gameoflife/gol/stubs"
-	"fmt"
 )
 
 // Params provides the details of how to run the Game of Life and which image to load.
@@ -33,10 +34,17 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	}
 	go startIo(p, ioChannels)
 
-	// Input data
-	ioCommand <- ioInput
-	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-	ioFilename <- imageName
+	// Establish contact with the server
+	srvrAddr := "localhost:8030"
+	server, err := rpc.Dial("tcp", srvrAddr)
+	handleError(err)
+	// defer server.Close()
+	// err = server.Call(, args, reply)
+	handleError(err)
+
+	def := new(stubs.Default)
+	status := new(stubs.Status)
+	server.Call(stubs.Connect, def, status)
 
 	args := stubs.StartArgs{
 		Turns:   p.Turns,
@@ -45,7 +53,7 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 		Width:   p.ImageWidth,
 	}
 
-	clientChannels := ClientChans{
+	clientChans := clientChans{
 		events,
 		IoCommand,
 		IoIdle,
@@ -54,9 +62,6 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 		IoOutput,
 		keyPresses,
 	}
-	client := Client{}
 
-	go clientRun(p, clientChannels, server)
-	// Make sure that the Io has finished any output before exiting.
-	// events <- ImageOutputComplete{turn, imageName}
+	go clientRun(p, clientChans, server)	
 }

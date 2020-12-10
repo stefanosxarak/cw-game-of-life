@@ -16,10 +16,6 @@ var Connect = "Server.Connect"
 // args = Default, reply = Alive
 var AliveCells = "Server.AliveCells"
 
-// Pause stops the server until further notice.
-// args = Default, reply = Turn
-var Pause = "Server.Pause"
-
 // Kill shuts down the server.
 // args = Default, reply = Turn
 var Kill = "Server.Kill"

@@ -1,8 +1,8 @@
 package gol
 
 import (
-	"uk.ac.bris.cs/gameoflife/gol/stubs"
 	"fmt"
+	"log"
 	"net/rpc"
 
 	"uk.ac.bris.cs/gameoflife/util"
@@ -15,7 +15,7 @@ import (
 // Implement key k at keyControl
 // stubs
 
-type ClientChans struct {
+type clientChans struct {
 	events     chan<- Event
 	ioCommand  chan<- ioCommand
 	ioIdle     <-chan bool
@@ -51,7 +51,7 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 }
 
 //progress to next state and update CellFlipped event
-func calculateNextState(p Params, turn int, c ClientChans, world [][]byte) [][]byte {
+func calculateNextState(p Params, turn int, c clientChans, world [][]byte) [][]byte {
 	newWorld := make([][]byte, p.ImageHeight)
 	for i := range newWorld {
 		newWorld[i] = make([]byte, p.ImageWidth)
@@ -95,7 +95,7 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 }
 
 // creates a grid for the current state of the world
-func makeWorld(height int, width int, c ClientChans) [][]uint8 {
+func makeWorld(height int, width int, c clientChans) [][]uint8 {
 	world := make([][]uint8, height)
 	for row := 0; row < height; row++ {
 		world[row] = make([]uint8, width)
@@ -115,8 +115,8 @@ func makeNewWorld(height int, width int) [][]uint8 {
 	return newWorld
 }
 
-// pause the game
-func pause(c ClientChans, turn int, x rune) {
+// pause the game and not the server!
+func pause(c clientChans, turn int, x rune) {
 	c.events <- StateChange{turn, Paused}
 	fmt.Println("The current turn is being processed.")
 	x = ' '
@@ -127,7 +127,7 @@ func pause(c ClientChans, turn int, x rune) {
 	c.events <- StateChange{turn, Executing}
 }
 
-func keyControl(c ClientChans, p Params, turn int, quit bool, world [][]uint8) bool {
+func keyControl(c clientChans, p Params, turn int, quit bool, world [][]uint8) bool {
 	//s to save, q to quit, p to pause/unpause, k to stop all comms with server
 	select {
 	case x := <-c.keyPresses:
@@ -138,10 +138,13 @@ func keyControl(c ClientChans, p Params, turn int, quit bool, world [][]uint8) b
 			c.events <- StateChange{turn, Quitting}
 		} else if x == 'p' {
 			pause(c, turn, x)
+
 		} else if x == 'k' {
+			quit = true
+			c.events <- StateChange{turn, Quitting}
 
 		} else {
-			New("Wrong Key. Please press 's' to save, 'q' to quit, 'p' to pause/unpause, 'k' to close all server communications ")
+			log.Fatalf("Wrong Key. Please press 's' to save, 'q' to quit, 'p' to pause/unpause, 'k' to close all server communications ")
 		}
 	default:
 		break
@@ -149,7 +152,7 @@ func keyControl(c ClientChans, p Params, turn int, quit bool, world [][]uint8) b
 	return quit
 }
 
-func saveWorld(c ClientChans, p Params, turn int, world [][]uint8) {
+func saveWorld(c clientChans, p Params, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
 	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
 	c.ioFilename <- outputFilename
@@ -160,7 +163,7 @@ func saveWorld(c ClientChans, p Params, turn int, world [][]uint8) {
 	}
 }
 
-func gameExecution(c ClientChans, p Params) (turn int) {
+func gameExecution(c clientChans, p Params) (turn int) {
 
 	//Initialization
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
@@ -197,37 +200,27 @@ func gameExecution(c ClientChans, p Params) (turn int) {
 	return turn
 }
 
-func clientRun(p Params, c ClientChans, server *rpc.Client) {
+func clientRun(p Params, c clientChans, server *rpc.Client) {
+	// Input data
+	c.ioCommand <- ioInput
+	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
+	c.ioFilename <- imageName
 
-	// Establish contact with the server
-	srvrAddr := "localhost:8030"
-	server, err := rpc.Dial("tcp", srvrAddr)
-	handleError(err)
-	defer server.Close()
-	// err = server.Call(, args, reply)
-	handleError(err)
+	// Place ticker here
 
-	def := new(stubs.Default)
-	status := new(stubs.Status)
-	server.Call(stubs.Connect, def, status)
-
+	//Extract final turn and close conn with server
 	turn := gameExecution(c, p)
 	server.Close()
 
+	// Make sure that the Io has finished any output before exiting.
+	c.events <- ImageOutputComplete{turn, imageName}
+	
+	// Exit
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 	c.events <- StateChange{turn, Quitting}
 
-	// // Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 
 }
-
-// func read(conn *net.Conn) {
-// 	// In a continuous loop, read a message from the server and display it.
-// 	for {
-// 		reader := bufio.NewReader(*conn)
-// 		msg, _ := reader.ReadString('\n')
-// 		fmt.Printf(msg)
-// 	}
-// }
