@@ -31,6 +31,7 @@ func main() {
 	// register the interface
 	server := new(ServerInterface)
 	rpc.Register(server)
+	
 
 	// Awaiting connection
 	ln, err := net.Listen("tcp", *portPtr)

@@ -1,7 +1,9 @@
 package gol
 
 import (
+	"fmt"
 	"net/rpc"
+
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -43,7 +45,19 @@ func calculateAliveClient(p Params, world [][]byte) []util.Cell {
 	return aliveCells
 }
 
-// func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
+// pause the game
+// func pause(c ClientChans, turn int, x rune) {
+// 	c.events <- StateChange{turn, Paused}
+// 	fmt.Println("The current turn is being processed.")
+// 	x = ' '
+// 	for x != 'p' {
+// 		x = <-c.keyPresses
+// 	}
+// 	fmt.Println("Continuing")
+// 	c.events <- StateChange{turn, Executing}
+// }
+
+// func keyControl(c ClientChans, p Params, turn int, quit bool, world [][]uint8) bool {
 // 	//s to save, q to quit, p to pause/unpause, k to stop all comms with server
 // 	select {
 // 	case x := <-c.keyPresses:
@@ -65,7 +79,7 @@ func calculateAliveClient(p Params, world [][]byte) []util.Cell {
 // 	return quit
 // }
 
-// func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
+// func saveWorld(c ClientChans, p Params, turn int, world [][]uint8) {
 // 	c.ioCommand <- ioOutput
 // 	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
 // 	c.ioFilename <- outputFilename
@@ -95,13 +109,12 @@ func clientRun(p Params, c ClientChans) {
 	// err = server.Call(, args, reply)
 	handleError(err)
 
-
 	//fmt.Fprintln(conn, *addrPtr)
 	// go read(&conn)
 
-	// c.ioCommand <- ioCheckIdle
-	// <-c.ioIdle
-	// c.events <- StateChange{turn, Quitting}
+	c.ioCommand <- ioCheckIdle
+	<-c.ioIdle
+	c.events <- StateChange{turn, Quitting}
 
 	// // Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	// close(c.events)

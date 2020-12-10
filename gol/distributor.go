@@ -2,6 +2,7 @@ package gol
 
 import (
 	"fmt"
+
 	"github.com/ChrisGora/semaphore"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -16,9 +17,10 @@ type distributorChannels struct {
 	keyPresses <-chan rune
 }
 type worker struct {
-	work     semaphore.Semaphore
-	space    semaphore.Semaphore
+	work  semaphore.Semaphore
+	space semaphore.Semaphore
 }
+
 //error struct
 type errorString struct {
 	s string
@@ -120,18 +122,20 @@ func makeNewWorld(height int, width int) [][]uint8 {
 }
 
 // worker functions
-func (w *worker)createWorkers(p Params,)[]worker {
+func (w *worker) createWorkers(p Params) []worker {
 	rowsPerWorker := p.ImageHeight / p.Threads
 	remaining := p.ImageHeight % p.Threads
 	workers := make([]worker, p.Threads)
 	for i := 0; i < p.Threads; i++ {
 		workers[i] = worker{}
 		workerRows := rowsPerWorker
+
 		//adds one of the remaining rows to a worker
 		if remaining > 0 {
 			workerRows++
 			remaining--
 		}
+
 		//Semaphores with buffer size 1 so all workers keep up
 		w.work = semaphore.Init(1, 1)
 		w.space = semaphore.Init(1, 0)
@@ -140,16 +144,15 @@ func (w *worker)createWorkers(p Params,)[]worker {
 	return workers
 }
 
-func (w *worker)runWorkers(p Params,c distributorChannels, world [][]uint8) {
+func (w *worker)runWorkers(p Params, c distributorChannels, world [][]uint8) {
 	//TODO :
-	// Implement the worker and calculateNextState 
+	// Implement the worker and calculateNextState
 	for turn := 0; ; turn++ {
 		w.work.Wait()
 		// workerSlice := calculateNextState(p, turn, c, world)
 		w.space.Post()
 	}
 }
-
 
 func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
@@ -198,44 +201,37 @@ func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels) {
-
-	//Input data
-	c.ioCommand <- ioInput
-	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-	c.ioFilename <- imageName
+func (w *worker)distributor(p Params, c distributorChannels) {
 
 	//Initialization
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
 	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 	// Start making workers and running them
-	// workers := createWorkers(p)
-	// go runWorkers()
+	workers := createWorkers(p)
+	go runWorkers()
 
 	//ticker channels
 	t := TickerChans{}
 	t.tick = make(chan bool)
 	t.done = make(chan bool)
-	
+
 	// A variable to store current alive cells
-	aliveCells := calculateAliveCells(p, newWorld)
-	
+	aliveCells := make([]util.Cell, 0)
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
 	//Game of Life.
 	quit := false
 	var turn int
-	
-	for turn = 0; turn < p.Turns && quit == false; turn++ {
-		go t.ticker(t.done)
-		// Waiting all workers to finish each round  
-		// for _, w := range workers {
-		// 	w.space.Wait()
-		// }
 
-	
+	for turn = 0; turn < p.Turns && quit == false; turn++ {
+		go t.ticker(c.events)
+		// Waiting all workers to finish each round
+		for _, w := range workers {
+			w.space.Wait()
+		}
+
 		quit = keyControl(c, p, turn, quit, world)
 		newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
@@ -248,9 +244,9 @@ func distributor(p Params, c distributorChannels) {
 		c.events <- TurnComplete{turn}
 
 		// Workers to start the next round if no q is pressed
-		// for i := 0; i < p.Threads && quit == false; i++ {
-		// 		workers[j].work.Post()
-		// }
+		for j := 0; j < p.Threads && quit == false; j++ {
+				workers[j].work.Post()
+		}
 
 	}
 	//terminate ticker
