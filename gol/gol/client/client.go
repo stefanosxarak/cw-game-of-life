@@ -162,7 +162,7 @@ func gameExecution(c ClientChans, p Params) {
 	var turn int
 
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
-		
+
 		// Waiting all workers to finish each round
 		// for _, w := range workers {
 		// 	w.space.Wait()
