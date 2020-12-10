@@ -1,7 +1,7 @@
 package gol
 
 import (
-	"uk.ac.bris.cs/gameoflife/gol/gol/server"
+	"uk.ac.bris.cs/gameoflife/gol/stubs"
 	"fmt"
 )
 
@@ -22,16 +22,7 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	ioOutput := make(chan uint8)
 	ioInput := make(chan uint8)
 
-	distributorChannels := distributorChannels{
-		events,
-		ioCommand,
-		ioIdle,
-		ioFilename,
-		ioOutput,
-		ioInput,
-		keyPresses,
-	}
-	go distributor(p, distributorChannels)
+	// go distributor(p, distributorChannels)
 
 	ioChannels := ioChannels{
 		command:  ioCommand,
@@ -47,7 +38,25 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
 	ioFilename <- imageName
 
-	go clientRun(p, clientChannels)
+	args := stubs.StartArgs{
+		Turns:   p.Turns,
+		Threads: p.Threads,
+		Height:  p.ImageHeight,
+		Width:   p.ImageWidth,
+	}
+
+	clientChannels := ClientChans{
+		events,
+		IoCommand,
+		IoIdle,
+		IoFilename,
+		IoInput,
+		IoOutput,
+		keyPresses,
+	}
+	client := Client{}
+
+	go clientRun(p, clientChannels, server)
 	// Make sure that the Io has finished any output before exiting.
 	// events <- ImageOutputComplete{turn, imageName}
 }

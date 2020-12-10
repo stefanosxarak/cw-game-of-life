@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"uk.ac.bris.cs/gameoflife/gol/stubs"
 	"fmt"
 	"net/rpc"
 
@@ -189,7 +190,6 @@ func gameExecution(c ClientChans, p Params) (turn int) {
 	//terminate ticker
 	// t.done <- true
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
-	
 
 	//saves the result to a file
 	saveWorld(c, p, turn, world)
@@ -206,6 +206,10 @@ func clientRun(p Params, c ClientChans, server *rpc.Client) {
 	defer server.Close()
 	// err = server.Call(, args, reply)
 	handleError(err)
+
+	def := new(stubs.Default)
+	status := new(stubs.Status)
+	server.Call(stubs.Connect, def, status)
 
 	turn := gameExecution(c, p)
 	server.Close()
