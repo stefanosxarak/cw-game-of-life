@@ -24,6 +24,10 @@ type ClientChans struct {
 	keyPresses <-chan rune
 }
 
+//Global Variables
+const alive = 255
+const dead = 0
+
 //error handling for server/client
 func handleError(err error) {
 	if err != nil {
@@ -31,7 +35,7 @@ func handleError(err error) {
 	}
 }
 
-func calculateAliveClient(p Params, world [][]byte) []util.Cell {
+func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	aliveCells := []util.Cell{}
 
 	for y := 0; y < p.ImageHeight; y++ {
@@ -101,6 +105,15 @@ func makeWorld(height int, width int, c ClientChans) [][]uint8 {
 	return world
 }
 
+//A 2D slice to store the updated world.
+func makeNewWorld(height int, width int) [][]uint8 {
+	newWorld := make([][]uint8, height)
+	for row := 0; row < height; row++ {
+		newWorld[row] = make([]uint8, width)
+	}
+	return newWorld
+}
+
 // pause the game
 func pause(c ClientChans, turn int, x rune) {
 	c.events <- StateChange{turn, Paused}
@@ -146,7 +159,7 @@ func saveWorld(c ClientChans, p Params, turn int, world [][]uint8) {
 	}
 }
 
-func gameExecution(c ClientChans, p Params) {
+func gameExecution(c ClientChans, p Params) (turn int) {
 
 	//Initialization
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
@@ -159,14 +172,7 @@ func gameExecution(c ClientChans, p Params) {
 
 	//Game of Life.
 	quit := false
-	var turn int
-
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
-
-		// Waiting all workers to finish each round
-		// for _, w := range workers {
-		// 	w.space.Wait()
-		// }
 
 		quit = keyControl(c, p, turn, quit, world)
 		newWorld = calculateNextState(p, turn, c, world)
@@ -179,17 +185,19 @@ func gameExecution(c ClientChans, p Params) {
 		c.events <- AliveCellsCount{turn, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 
-		// Workers to start the next round if no q is pressed
-		// for j := 0; j < p.Threads && quit == false; j++ {
-		// 	workers[j].work.Post()
-		// }
-
 	}
 	//terminate ticker
 	// t.done <- true
+	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
+	
+
+	//saves the result to a file
+	saveWorld(c, p, turn, world)
+
+	return turn
 }
 
-func clientRun(p Params, c ClientChans) {
+func clientRun(p Params, c ClientChans, server *rpc.Client) {
 
 	// Establish contact with the server
 	srvrAddr := "localhost:8030"
@@ -199,8 +207,8 @@ func clientRun(p Params, c ClientChans) {
 	// err = server.Call(, args, reply)
 	handleError(err)
 
-	//fmt.Fprintln(conn, *addrPtr)
-	// go read(&conn)
+	turn := gameExecution(c, p)
+	server.Close()
 
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
@@ -209,8 +217,6 @@ func clientRun(p Params, c ClientChans) {
 	// // Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 
-	//TODO Start asynchronously reading and displaying messages
-	//TODO Start getting and sending user messages.
 }
 
 // func read(conn *net.Conn) {

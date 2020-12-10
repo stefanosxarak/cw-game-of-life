@@ -20,8 +20,20 @@ type ServerInterface struct {
 // Kill server
 // Pause/unpause server
 
-func main() {
 
+
+
+// func (s *Server) AliveCells(args stubs.Default, reply *stubs.Alive) error {
+
+// 	reply.Num = len(s.distributor.CalculateAliveCells())
+// 	reply.Turn = s.distributor.currentTurn
+
+// 	return nil
+// }
+
+
+
+func main() {
 	// parse compiler flags
 	fmt.Println("Launching server...")
 	fmt.Println("Listen on port")

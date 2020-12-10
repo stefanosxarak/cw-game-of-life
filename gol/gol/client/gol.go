@@ -1,6 +1,9 @@
 package gol
 
-import "fmt"
+import (
+	"uk.ac.bris.cs/gameoflife/gol/gol/server"
+	"fmt"
+)
 
 // Params provides the details of how to run the Game of Life and which image to load.
 type Params struct {
@@ -44,5 +47,7 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
 	ioFilename <- imageName
 
-	go clientRun(p ,clientChannels)
+	go clientRun(p, clientChannels)
+	// Make sure that the Io has finished any output before exiting.
+	// events <- ImageOutputComplete{turn, imageName}
 }
