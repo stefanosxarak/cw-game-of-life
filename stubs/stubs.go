@@ -1,17 +1,23 @@
 package stubs
 
+var worldFromServer = "ServerInterface.worldFromServer"
+
+// Empty struct that acts as default args
+type Default struct{}
+
 type Response struct {
-	W [][]byte
+	World [][]uint8
 }
 
 type Request struct {
-	W     [][]byte
+	World     [][]uint8
 	Param Parameters
 }
 
+// Could have integrated this struct with the Request but no time!
 type Parameters struct {
-	Turns       int
-	Threads     int
-	ImageWidth  int
 	ImageHeight int
+	ImageWidth  int
+	Turns       int
+	// Threads     int
 }

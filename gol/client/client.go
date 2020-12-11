@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/rpc"
 
+	"uk.ac.bris.cs/gameoflife/stubs"
+
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -28,6 +30,11 @@ type clientChans struct {
 //Global Variables
 const alive = 255
 const dead = 0
+
+type Client struct {
+	// t    Ticker
+	quit bool
+}
 
 //error handling for server/client
 func handleError(err error) {
@@ -79,6 +86,15 @@ func calculateNextState(p Params, turn int, c clientChans, world [][]byte) [][]b
 	return newWorld
 }
 
+// Gets a proccessed world from server
+func worldFromServer(server *rpc.Client) (world [][]uint8) {
+	args := new(stubs.Default)
+	reply := new(stubs.Request)
+	err := server.Call(stubs.worldFromServer, args, reply)
+	handleError(err)
+	return reply.World
+}
+
 //calculateNeighbors takes the current state of the world and completes one evolution of the world. It then returns the result
 func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 	neighbours := 0
@@ -127,29 +143,32 @@ func pause(c clientChans, turn int, x rune) {
 	c.events <- StateChange{turn, Executing}
 }
 
-func keyControl(c clientChans, p Params, turn int, quit bool, world [][]uint8) bool {
-	//s to save, q to quit, p to pause/unpause, k to stop all comms with server
+func (client *Client) keyControl(c clientChans, p Params, turn int, quit bool, server *rpc.Client) bool {
+	//s to save, q to client.quit, p to pause/unpause, k to stop all comms with server
 	select {
 	case x := <-c.keyPresses:
 		if x == 's' {
+			world := worldFromServer(server)
 			saveWorld(c, p, turn, world)
 		} else if x == 'q' {
-			quit = true
+			client.quit = true
 			c.events <- StateChange{turn, Quitting}
 		} else if x == 'p' {
 			pause(c, turn, x)
 
 		} else if x == 'k' {
-			quit = true
+			world := worldFromServer(server)
+			client.quit = true
+			saveWorld(c, p, turn, world)
 			c.events <- StateChange{turn, Quitting}
 
 		} else {
-			log.Fatalf("Wrong Key. Please press 's' to save, 'q' to quit, 'p' to pause/unpause, 'k' to close all server communications ")
+			log.Fatalf("Wrong Key. Please press 's' to save, 'q' to client.quit, 'p' to pause/unpause, 'k' to close all server communications ")
 		}
 	default:
 		break
 	}
-	return quit
+	return client.quit
 }
 
 func saveWorld(c clientChans, p Params, turn int, world [][]uint8) {
@@ -163,7 +182,7 @@ func saveWorld(c clientChans, p Params, turn int, world [][]uint8) {
 	}
 }
 
-func gameExecution(c clientChans, p Params) (turn int) {
+func (client *Client) gameExecution(c clientChans, p Params, server *rpc.Client) (turn int) {
 
 	//Initialization
 	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
@@ -176,10 +195,10 @@ func gameExecution(c clientChans, p Params) (turn int) {
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
 	//Game of Life.
-	quit := false
-	for turn = 0; turn < p.Turns && quit == false; turn++ {
+	client.quit = false
+	for turn = 0; turn < p.Turns && client.quit == false; turn++ {
 
-		quit = keyControl(c, p, turn, quit, world)
+		client.quit = client.keyControl(c, p, turn, client.quit, server)
 		newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
 		//we add the newly updated world to the grid we had made
@@ -202,7 +221,7 @@ func gameExecution(c clientChans, p Params) (turn int) {
 	return turn
 }
 
-func clientRun(p Params, c clientChans, server *rpc.Client) {
+func (client *Client) clientRun(p Params, c clientChans, server *rpc.Client) {
 	// Input data
 	c.ioCommand <- ioInput
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
@@ -210,8 +229,15 @@ func clientRun(p Params, c clientChans, server *rpc.Client) {
 
 	// Place ticker here
 
-	//Extract final turn and close conn with server
-	turn := gameExecution(c, p)
+	//Extract final info and close conn with server
+
+	turn := client.gameExecution(c, p, server)
+	if client.quit == true {
+		// args := new(stubs.Default)
+		// reply := new(stubs.Turn)
+		// err := server.Call(stubs.Kill, args, reply)
+		// handleError(err)
+	}
 	server.Close()
 
 	// Make sure that the Io has finished any output before exiting.

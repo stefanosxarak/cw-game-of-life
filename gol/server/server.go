@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/rpc"
+
+	"uk.ac.bris.cs/gameoflife/stubs"
 )
 
 // Visit:
@@ -12,6 +14,7 @@ import (
 // https://golang.org/src/runtime/stubs.go for info about how stubs work or check the DS lab
 
 type ServerInterface struct {
+	// distributor Distributor
 }
 
 //TODO:
@@ -26,6 +29,33 @@ type ServerInterface struct {
 
 // 	return nil
 // }
+
+// beginWorlds starts processing worlds
+// func (s *ServerInterface) beginWorlds(args stubs.StartArgs, reply *stubs.Default) error {
+
+// 	s.distributor = Distributor{
+// 		currentTurn: 0,
+// 		numOfTurns:  args.Turns,
+// 		threads:     args.Threads,
+// 		imageWidth:  args.Width,
+// 		imageHeight: args.Height,
+// 		prevWorld:   WorldSlice,
+// 		paused:      make(chan bool),
+// 	}
+// 	go s.distributor.distributor(p)
+// 	return nil
+// }
+
+// Sends a proccessed world from Server
+func (s *ServerInterface) worldFromServer(args stubs.Default, reply *stubs.Request) error {
+
+	reply.World = s.distributor.prevWorld
+	reply.Param.Turns = s.distributor.currentTurn
+	reply.Param.ImageHeight = s.distributor.imageHeight
+	reply.Param.ImageWidth = s.distributor.imageWidth
+
+	return nil
+}
 
 func main() {
 	// parse compiler flags
