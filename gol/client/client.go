@@ -171,6 +171,7 @@ func gameExecution(c clientChans, p Params) (turn int) {
 
 	// A variable to store current alive cells
 	aliveCells := make([]util.Cell, 0)
+
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
@@ -191,6 +192,7 @@ func gameExecution(c clientChans, p Params) (turn int) {
 
 	}
 	//terminate ticker
+
 	// t.done <- true
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
 
@@ -214,7 +216,7 @@ func clientRun(p Params, c clientChans, server *rpc.Client) {
 
 	// Make sure that the Io has finished any output before exiting.
 	c.events <- ImageOutputComplete{turn, imageName}
-	
+
 	// Exit
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle

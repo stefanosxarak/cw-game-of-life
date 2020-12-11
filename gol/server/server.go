@@ -1,4 +1,4 @@
-package gol
+package main
 
 import (
 	"flag"
@@ -18,7 +18,6 @@ type ServerInterface struct {
 // Implement ServerInterface
 // Sends a AliveCellsCount event to Client every 2 seconds
 // Kill server
-
 
 // func (s *Server) AliveCells(args stubs.Default, reply *stubs.Alive) error {
 
