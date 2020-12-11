@@ -131,7 +131,7 @@ func makeNewWorld(height int, width int) [][]uint8 {
 	return newWorld
 }
 
-// pause the game and not the server!
+// pause game proccessing and not the server!
 func pause(c clientChans, turn int, x rune) {
 	c.events <- StateChange{turn, Paused}
 	fmt.Println("The current turn is being processed.")
@@ -141,6 +141,19 @@ func pause(c clientChans, turn int, x rune) {
 	}
 	fmt.Println("Continuing")
 	c.events <- StateChange{turn, Executing}
+}
+
+func saveWorld(c clientChans, p Params, turn int, world [][]uint8) {
+	c.ioCommand <- ioOutput
+	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
+	c.ioFilename <- outputFilename
+	for row := 0; row < p.ImageHeight; row++ {
+		for cell := 0; cell < p.ImageWidth; cell++ {
+			c.ioOutput <- world[row][cell]
+		}
+	}
+	// Notify events every time the world is saved i.e. every time this function is called
+	c.events <- ImageOutputComplete{turn, outputFilename}
 }
 
 func (client *Client) keyControl(c clientChans, p Params, turn int, quit bool, server *rpc.Client) bool {
@@ -171,17 +184,7 @@ func (client *Client) keyControl(c clientChans, p Params, turn int, quit bool, s
 	return client.quit
 }
 
-func saveWorld(c clientChans, p Params, turn int, world [][]uint8) {
-	c.ioCommand <- ioOutput
-	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
-	c.ioFilename <- outputFilename
-	for row := 0; row < p.ImageHeight; row++ {
-		for cell := 0; cell < p.ImageWidth; cell++ {
-			c.ioOutput <- world[row][cell]
-		}
-	}
-}
-
+//TODO needs to be safely transfered to server
 func (client *Client) gameExecution(c clientChans, p Params, server *rpc.Client) (turn int) {
 
 	//Initialization
@@ -230,18 +233,16 @@ func (client *Client) clientRun(p Params, c clientChans, server *rpc.Client) {
 	// Place ticker here
 
 	//Extract final info and close conn with server
-
 	turn := client.gameExecution(c, p, server)
 	if client.quit == true {
+		// KILL SERVER
+
 		// args := new(stubs.Default)
 		// reply := new(stubs.Turn)
 		// err := server.Call(stubs.Kill, args, reply)
 		// handleError(err)
 	}
 	server.Close()
-
-	// Make sure that the Io has finished any output before exiting.
-	c.events <- ImageOutputComplete{turn, imageName}
 
 	// Exit
 	c.ioCommand <- ioCheckIdle

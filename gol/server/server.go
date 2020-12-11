@@ -22,7 +22,7 @@ type ServerInterface struct {
 // Sends a AliveCellsCount event to Client every 2 seconds
 // Kill server
 
-// func (s *Server) AliveCells(args stubs.Default, reply *stubs.Alive) error {
+// func (s *ServerInterface) AliveCells(args stubs.Default, reply *stubs.Alive) error {
 
 // 	reply.Num = len(s.distributor.CalculateAliveCells())
 // 	reply.Turn = s.distributor.currentTurn
@@ -48,7 +48,7 @@ type ServerInterface struct {
 
 // Sends a proccessed world from Server
 func (s *ServerInterface) worldFromServer(args stubs.Default, reply *stubs.Request) error {
-
+	// TODO: Take the correct data from distributor 
 	reply.World = s.distributor.prevWorld
 	reply.Param.Turns = s.distributor.currentTurn
 	reply.Param.ImageHeight = s.distributor.imageHeight
@@ -64,12 +64,12 @@ func main() {
 	portPtr := flag.String("this", "8030", "Port to listen on")
 	flag.Parse()
 
-	// register the interface
+	// register the Server
 	server := new(ServerInterface)
 	rpc.Register(server)
 
 	// Awaiting connection
-	ln, err := net.Listen("tcp", *portPtr)
+	ln, err := net.Listen("tcp",": " +*portPtr)
 	if err != nil {
 		panic(err)
 	}

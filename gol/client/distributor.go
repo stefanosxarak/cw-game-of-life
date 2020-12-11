@@ -1,7 +1,5 @@
 package gol
 
-// "github.com/ChrisGora/semaphore"
-
 type distributorChannels struct {
 	events     chan<- Event
 	ioCommand  chan<- ioCommand
@@ -31,10 +29,6 @@ func mod(x, m int) int {
 // 			remaining--
 // 		}
 
-// 		//Semaphores with buffer size 1 so all workers keep up
-// 		w.work = semaphore.Init(1, 1)
-// 		w.space = semaphore.Init(1, 0)
-
 // 	}
 // 	return workers
 // }
@@ -43,14 +37,11 @@ func mod(x, m int) int {
 // 	//TODO :
 // 	// Implement the worker and calculateNextState
 // 	for turn := 0; ; turn++ {
-// 		w.work.Wait()
 // 		// workerSlice := calculateNextState(p, turn, c, world)
-// 		w.space.Post()
 // 	}
 // }
 
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
-
 
 }
