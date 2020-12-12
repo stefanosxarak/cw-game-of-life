@@ -177,7 +177,7 @@ func pause(c distributorChannels, turn int, x rune) {
 }
 
 // Button control
-func keyControl(x rune, c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
+func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
 	//s to save, q to quit, p to pause/unpause, k to stop all comms with server
 	select {
 	case x := <-c.keyPresses:
@@ -199,7 +199,7 @@ func keyControl(x rune, c distributorChannels, p Params, turn int, quit bool, wo
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
+func distributor(p Params, c distributorChannels) {
 
 	//Input data
 	c.ioCommand <- ioInput
@@ -223,12 +223,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	//Game of Life.
 	quit := false
 	var turn int
-	// c.events <- AliveCellsCount{turn, len(aliveCells)}
 	ticker := time.NewTicker(2 * time.Second)
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
-		// c.events <- AliveCellsCount{turn, len(aliveCells)}
 
-		fmt.Println(len(aliveCells))
+		// fmt.Println(len(aliveCells))
 
 		// Waiting all workers to finish each round
 		// for _, w := range workers {
@@ -237,22 +235,22 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 		newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
+
 		//we add the newly updated world to the grid we had made
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
+		quit = keyControl(c, p, turn, quit, world)
+		//ticker
 		select {
-		case x := <-keyPresses:
-			quit = keyControl(x, c, p, turn, quit, world)
-
 		case <-ticker.C:
 			c.events <- AliveCellsCount{turn, len(aliveCells)}
 
 		default:
 			break
 		}
-		//update events
-		// c.events <- AliveCellsCount{turn + 1, len(aliveCells)}
+
+		//update turns
 		c.events <- TurnComplete{turn}
 
 		// Workers to start the next round if no q is pressed
