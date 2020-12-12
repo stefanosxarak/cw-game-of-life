@@ -2,6 +2,7 @@ package gol
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ChrisGora/semaphore"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -176,7 +177,7 @@ func pause(c distributorChannels, turn int, x rune) {
 }
 
 // Button control
-func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
+func keyControl(x rune, c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
 	//s to save, q to quit, p to pause/unpause, k to stop all comms with server
 	select {
 	case x := <-c.keyPresses:
@@ -185,6 +186,7 @@ func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]
 		} else if x == 'q' {
 			quit = true
 			c.events <- StateChange{turn, Quitting}
+			break
 		} else if x == 'p' {
 			pause(c, turn, x)
 		} else {
@@ -197,7 +199,7 @@ func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels) {
+func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	//Input data
 	c.ioCommand <- ioInput
@@ -212,11 +214,6 @@ func distributor(p Params, c distributorChannels) {
 	// workers := createWorkers(p)
 	// go runWorkers()
 
-	//ticker channels
-	t := TickerChans{}
-	t.tick = make(chan bool)
-	t.done = make(chan bool)
-
 	// A variable to store current alive cells
 	aliveCells := calculateAliveCells(p, newWorld)
 
@@ -226,23 +223,36 @@ func distributor(p Params, c distributorChannels) {
 	//Game of Life.
 	quit := false
 	var turn int
-
+	// c.events <- AliveCellsCount{turn, len(aliveCells)}
+	ticker := time.NewTicker(2 * time.Second)
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
-		go t.ticker(t.done)
+		// c.events <- AliveCellsCount{turn, len(aliveCells)}
+
+		fmt.Println(len(aliveCells))
+
 		// Waiting all workers to finish each round
 		// for _, w := range workers {
 		// 	w.space.Wait()
 		// }
 
-		quit = keyControl(c, p, turn, quit, world)
 		newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
 		//we add the newly updated world to the grid we had made
 		world = newWorld
 		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
+		select {
+		case x := <-keyPresses:
+			quit = keyControl(x, c, p, turn, quit, world)
+
+		case <-ticker.C:
+			c.events <- AliveCellsCount{turn, len(aliveCells)}
+
+		default:
+			break
+		}
 		//update events
-		c.events <- AliveCellsCount{turn, len(aliveCells)}
+		// c.events <- AliveCellsCount{turn + 1, len(aliveCells)}
 		c.events <- TurnComplete{turn}
 
 		// Workers to start the next round if no q is pressed
@@ -252,7 +262,7 @@ func distributor(p Params, c distributorChannels) {
 
 	}
 	//terminate ticker
-	t.done <- true
+	ticker.Stop()
 
 	//saves the result to a file
 	saveWorld(c, p, turn, world)
