@@ -43,7 +43,7 @@ func New(text string) error {
 }
 
 //calculateNeighbors takes the current state of the world and completes one evolution of the world. It then returns the result
-func calculateNeighbours(p Params, x, y int, world [][]byte) int {
+func calculateNeighbours(p stubs.Parameters, x, y int, world [][]byte) int {
 	neighbours := 0
 	for i := -1; i <= 1; i++ {
 		for j := -1; j <= 1; j++ {
@@ -58,7 +58,7 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 }
 
 //progress to next state and update CellFlipped event
-func calculateNextState(p Params, turn int, c distributorChannels, world [][]byte) [][]byte {
+func calculateNextState(p stubs.Parameters, turn int, c distributorChannels, world [][]byte) [][]byte {
 	newWorld := make([][]byte, p.ImageHeight)
 	for i := range newWorld {
 		newWorld[i] = make([]byte, p.ImageWidth)

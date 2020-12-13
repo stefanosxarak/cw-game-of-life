@@ -159,8 +159,6 @@ func (client *Client) clientRun(p Params, c distributorChannels, server *rpc.Cli
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
 	c.ioFilename <- imageName
 
-	// Place ticker here
-
 	//Extract final info and close conn with server
 	turn := client.gameExecution(c, p, server)
 	if client.quit == true {
