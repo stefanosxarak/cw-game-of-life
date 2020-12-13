@@ -63,7 +63,7 @@ func main() {
 	fmt.Println("Listen on port")
 	portPtr := flag.String("this", "8030", "Port to listen on")
 	flag.Parse()
-
+	
 	// register the Server
 	server := new(ServerInterface)
 	rpc.Register(server)
@@ -73,6 +73,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Print("Server is active...")
 	defer ln.Close()
 	rpc.Accept(ln)
 }
