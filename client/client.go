@@ -1,11 +1,12 @@
 package gol
 
 import (
-	"uk.ac.bris.cs/gameoflife/stubs"
 	"fmt"
 	"log"
 	"net/rpc"
 	"time"
+
+	"uk.ac.bris.cs/gameoflife/stubs"
 
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -30,6 +31,9 @@ type Client struct {
 	quit bool
 }
 
+const alive = 255
+const dead = 0
+
 //error handling for server/client
 func handleError(err error) {
 	if err != nil {
@@ -52,14 +56,23 @@ func calculateAliveCells(p stubs.Parameters, world [][]byte) []util.Cell {
 }
 
 // Gets a proccessed world from server
-func (client *Client) getWorld(server *rpc.Client) (world [][]uint8, turn int) {
+func (client *Client) worldFromServer(server *rpc.Client) (world [][]uint8, turn int) {
 	args := new(stubs.Default)
 	reply := new(stubs.World)
-	err := server.Call(stubs.GetWorld, args, reply)
+	err := server.Call(stubs.WorldFromServer, args, reply)
 	if err != nil {
 		fmt.Println("err", err)
 	}
 	return reply.World, reply.Turn
+}
+
+// Terminate contact with server
+func (client *Client) killServer(server *rpc.Client) (turn int) {
+	args := new(stubs.Default)
+	reply := new(stubs.Parameters.Turns)
+	err := server.Call(stubs.Kill, args, reply)
+	handleError(err)
+	return reply.Turn
 }
 
 // pause game proccessing and not the server!
@@ -92,7 +105,8 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 	select {
 	case x := <-c.keyPresses:
 		if x == 's' {
-			world := worldFromServer(server)
+			fmt.Println("Saving...")
+			world := client.worldFromServer(server)
 			saveWorld(c, p, turn, world)
 		} else if x == 'q' {
 			client.quit = true
@@ -101,7 +115,8 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 			pause(c, turn, x)
 
 		} else if x == 'k' {
-			world := worldFromServer(server)
+			fmt.Println("Contact with server ceases to exist...")
+			world := client.worldFromServer(server)
 			client.quit = true
 			saveWorld(c, p, turn, world)
 			c.events <- StateChange{turn, Quitting}
@@ -128,13 +143,14 @@ func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
+	world := client.worldFromServer(server)
+
 	//Game of Life.
 	client.quit = false
 	ticker := time.NewTicker(2 * time.Second)
 	for turn = 0; turn < p.Turns && client.quit == false; turn++ {
 
 		// newWorld = calculateNextState(p, turn, c, world)
-		aliveCells = calculateAliveCells(p, world)
 
 		//we add the newly updated world to the grid we had made
 		// world = newWorld
@@ -145,6 +161,7 @@ func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server
 		//ticker
 		select {
 		case <-ticker.C:
+			aliveCells = calculateAliveCells(p, world)
 			c.events <- AliveCellsCount{turn, len(aliveCells)}
 
 		default:
@@ -174,12 +191,7 @@ func (client *Client) clientRun(p stubs.Parameters, c clientChannels, server *rp
 	//Extract final info and close conn with server
 	turn := client.gameExecution(c, p, server)
 	if client.quit == true {
-		// KILL SERVER
-
-		// args := new(stubs.Default)
-		// reply := new(stubs.Turn)
-		// err := server.Call(stubs.Kill, args, reply)
-		// handleError(err)
+		client.killServer(server)
 	}
 	server.Close()
 

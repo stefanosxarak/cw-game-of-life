@@ -1,8 +1,9 @@
 package gol
 
 import (
-	"uk.ac.bris.cs/gameoflife/stubs"
 	"net/rpc"
+
+	"uk.ac.bris.cs/gameoflife/stubs"
 )
 
 // Params provides the details of how to run the Game of Life and which image to load.
@@ -22,15 +23,16 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	ioOutput := make(chan uint8)
 	ioInput := make(chan uint8)
 
-	// distributorChannels := distributorChannels{
-	// 	events,
-	// 	ioCommand,
-	// 	ioIdle,
-	// 	ioFilename,
-	// 	ioInput,
-	// 	ioOutput,
-	// 	keyPresses,
-	// }
+	clientChannels := clientChannels{
+		events,
+		IoCommand,
+		IoIdle,
+		IoFilename,
+		IoInput,
+		IoOutput,
+		keyPresses,
+	}
+	client := Client{}
 
 	ioChannels := ioChannels{
 		command:  ioCommand,
@@ -49,24 +51,14 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	// err = server.Call(, args, reply)
 	handleError(err)
 
-	r := stubs.Parameters{p.ImageHeight, p.ImageWidth, p.Turns}
+	r := stubs.Parameters{p.ImageHeight, p.ImageWidth, p.Turns, p.Threads}
 	// Request the initial world and all its parameters
 	req := new(stubs.Request)
 
 	// Respond with the final world and all its parameters
 	res := new(stubs.Response)
-	err = server.Call(stubs.NextState, request, response)
+	// err = server.Call(stubs.NextState, request, response)
 	handleError(err)
 
-
-	clientChannels := clientChans{
-		events,
-		IoCommand,
-		IoIdle,
-		IoFilename,
-		IoInput,
-		IoOutput,
-		keyPresses,
-	}
-	// go clientRun(p, clientChannels, server)
+	go clientRun(p, clientChannels, server)
 }

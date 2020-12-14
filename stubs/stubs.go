@@ -1,6 +1,8 @@
 package stubs
 
-var worldFromServer = "ServerInterface.worldFromServer"
+var WorldFromServer = "Server.worldFromServer"
+
+var Kill = "Server.Kill"
 
 // Empty struct that acts as default args
 type Default struct{}
@@ -10,7 +12,7 @@ type Response struct {
 }
 
 type Request struct {
-	World     [][]uint8
+	World [][]uint8
 	Param Parameters
 }
 
@@ -19,5 +21,5 @@ type Parameters struct {
 	ImageHeight int
 	ImageWidth  int
 	Turns       int
-	// Threads     int
+	Threads     int
 }

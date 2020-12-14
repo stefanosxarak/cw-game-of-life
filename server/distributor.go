@@ -14,8 +14,12 @@ import (
 // 	keyPresses <-chan rune
 // }
 type Data struct {
-	world    [][]uint8
-	newWorld [][]uint8
+	world       [][]uint8
+	newWorld    [][]uint8
+	threads     int
+	imageWidth  int
+	imageHeight int
+	turns       int
 }
 
 //error struct
@@ -23,8 +27,7 @@ type errorString struct {
 	s string
 }
 
-const alive = 255
-const dead = 0
+
 
 func mod(x, m int) int {
 	return (x + m) % m
@@ -86,14 +89,11 @@ func (d *Data) makeNewWorld(height int, width int) {
 func (d *Data) distributor(p stubs.Parameters) {
 
 	//Initialization
-	// d.makeWorld(p.ImageHeight, p.ImageWidth, c)
 	d.makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 	//Game of Life.
 	var turn int
 	for turn = 0; turn < p.Turns; turn++ {
-
-		// newWorld = calculateNextState(p, turn, c, world)
 
 		//we add the newly updated world to the grid we had made
 		d.world = d.newWorld

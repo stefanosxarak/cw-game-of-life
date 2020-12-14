@@ -13,46 +13,44 @@ import (
 // https://golang.org/pkg/net/rpc/ for info about how rpc works
 // https://golang.org/src/runtime/stubs.go for info about how stubs work or check the DS lab
 
-type ServerInterface struct {
-	// distributor Distributor
+type Server struct {
+	data Data
 }
 
 //TODO:
-// Implement ServerInterface
+// Implement Server
 // Sends a AliveCellsCount event to Client every 2 seconds
 // Kill server
 
-// func (s *ServerInterface) AliveCells(args stubs.Default, reply *stubs.Alive) error {
+// func (s *Server) AliveCells(args stubs.Default, reply *stubs.Alive) error {
 
-// 	reply.Num = len(s.distributor.CalculateAliveCells())
-// 	reply.Turn = s.distributor.currentTurn
+// 	reply.Num = len(s.data.CalculateAliveCells())
+// 	reply.Turn = s.data.currentTurn
 
 // 	return nil
 // }
 
 // beginWorlds starts processing worlds
-// func (s *ServerInterface) beginWorlds(args stubs.StartArgs, reply *stubs.Default) error {
-
-// 	s.distributor = Distributor{
-// 		currentTurn: 0,
-// 		numOfTurns:  args.Turns,
-// 		threads:     args.Threads,
-// 		imageWidth:  args.Width,
-// 		imageHeight: args.Height,
-// 		prevWorld:   WorldSlice,
-// 		paused:      make(chan bool),
-// 	}
-// 	go s.distributor.distributor(p)
-// 	return nil
-// }
+func (s *Server) beginWorlds(args stubs.Request, reply *stubs.Default) error {
+	s.data = Data{
+		// currentTurn: 0,
+		world:       args.World,
+		imageHeight: args.Param.ImageHeight,
+		imageWidth:  args.Param.ImageWidth,
+		turns:       args.Param.Turns,
+		threads:     args.Param.Threads,
+	}
+	// go s.data.distributor()
+	return nil
+}
 
 // Sends a proccessed world from Server
-func (s *ServerInterface) worldFromServer(args stubs.Default, reply *stubs.Request) error {
-	// TODO: Take the correct data from distributor 
-	reply.World = s.distributor.prevWorld
-	reply.Param.Turns = s.distributor.currentTurn
-	reply.Param.ImageHeight = s.distributor.imageHeight
-	reply.Param.ImageWidth = s.distributor.imageWidth
+func (s *Server) worldFromServer(args stubs.Default, reply *stubs.Request) error {
+	// TODO: Take the correct data from distributor
+	reply.World = s.data.world
+	reply.Param.Turns = s.data.turns
+	reply.Param.ImageHeight = s.data.imageHeight
+	reply.Param.ImageWidth = s.data.imageWidth
 
 	return nil
 }
@@ -63,13 +61,13 @@ func main() {
 	fmt.Println("Listen on port")
 	portPtr := flag.String("this", "8030", "Port to listen on")
 	flag.Parse()
-	
+
 	// register the Server
-	server := new(ServerInterface)
+	server := new(Server)
 	rpc.Register(server)
 
 	// Awaiting connection
-	ln, err := net.Listen("tcp",": " +*portPtr)
+	ln, err := net.Listen("tcp", ": "+*portPtr)
 	if err != nil {
 		panic(err)
 	}
