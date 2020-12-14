@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"uk.ac.bris.cs/gameoflife/stubs"
 	"fmt"
 	"log"
 	"net/rpc"
@@ -9,9 +10,18 @@ import (
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
+type clientChannels struct {
+	events     chan<- Event
+	ioCommand  chan<- ioCommand
+	ioIdle     <-chan bool
+	ioFilename chan<- string
+	ioInput    <-chan uint8
+	ioOutput   chan<- uint8
+	keyPresses <-chan rune
+}
+
 //TODO:
 // Implement a basic controller which can tell the logic engine to evolve Game of Life for the number of turns
-// saveWorld
 // keyControl
 // Implement key k at keyControl
 // stubs
@@ -27,7 +37,7 @@ func handleError(err error) {
 	}
 }
 
-func calculateAliveCells(p Params, world [][]byte) []util.Cell {
+func calculateAliveCells(p stubs.Parameters, world [][]byte) []util.Cell {
 	aliveCells := []util.Cell{}
 
 	for y := 0; y < p.ImageHeight; y++ {
@@ -42,16 +52,18 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 }
 
 // Gets a proccessed world from server
-// func worldFromServer(server *rpc.Client) (world [][]uint8) {
-// 	args := new(stubs.Default)
-// 	reply := new(stubs.Request)
-// 	err := server.Call(stubs.worldFromServer, args, reply)
-// 	handleError(err)
-// 	return reply.World
-// }
+func (client *Client) getWorld(server *rpc.Client) (world [][]uint8, turn int) {
+	args := new(stubs.Default)
+	reply := new(stubs.World)
+	err := server.Call(stubs.GetWorld, args, reply)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	return reply.World, reply.Turn
+}
 
 // pause game proccessing and not the server!
-func pause(c distributorChannels, turn int, x rune) {
+func pause(c clientChannels, turn int, x rune) {
 	c.events <- StateChange{turn, Paused}
 	fmt.Println("The current turn is being processed.")
 	x = ' '
@@ -62,7 +74,7 @@ func pause(c distributorChannels, turn int, x rune) {
 	c.events <- StateChange{turn, Executing}
 }
 
-func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
+func saveWorld(c clientChannels, p stubs.Parameters, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
 	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
 	c.ioFilename <- outputFilename
@@ -75,12 +87,12 @@ func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
 	c.events <- ImageOutputComplete{turn, outputFilename}
 }
 
-func (client *Client) keyControl(c distributorChannels, p Params, turn int, quit bool, server *rpc.Client) bool {
+func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int, quit bool, server *rpc.Client) bool {
 	//s to save, q to client.quit, p to pause/unpause, k to stop all comms with server
 	select {
 	case x := <-c.keyPresses:
 		if x == 's' {
-			// world := worldFromServer(server)
+			world := worldFromServer(server)
 			saveWorld(c, p, turn, world)
 		} else if x == 'q' {
 			client.quit = true
@@ -89,7 +101,7 @@ func (client *Client) keyControl(c distributorChannels, p Params, turn int, quit
 			pause(c, turn, x)
 
 		} else if x == 'k' {
-			// world := worldFromServer(server)
+			world := worldFromServer(server)
 			client.quit = true
 			saveWorld(c, p, turn, world)
 			c.events <- StateChange{turn, Quitting}
@@ -104,11 +116,11 @@ func (client *Client) keyControl(c distributorChannels, p Params, turn int, quit
 }
 
 //TODO needs to be safely transfered to server
-func (client *Client) gameExecution(c distributorChannels, p Params, server *rpc.Client) (turn int) {
+func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server *rpc.Client) (turn int) {
 
 	//Initialization
-	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
-	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
+	// world := makeWorld(p.ImageHeight, p.ImageWidth, c)
+	// newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 	// A variable to store current alive cells
 	aliveCells := make([]util.Cell, 0)
@@ -121,12 +133,12 @@ func (client *Client) gameExecution(c distributorChannels, p Params, server *rpc
 	ticker := time.NewTicker(2 * time.Second)
 	for turn = 0; turn < p.Turns && client.quit == false; turn++ {
 
-		newWorld = calculateNextState(p, turn, c, world)
+		// newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
 
 		//we add the newly updated world to the grid we had made
-		world = newWorld
-		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
+		// world = newWorld
+		// newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 		client.quit = client.keyControl(c, p, turn, client.quit, server)
 
@@ -153,7 +165,7 @@ func (client *Client) gameExecution(c distributorChannels, p Params, server *rpc
 	return turn
 }
 
-func (client *Client) clientRun(p Params, c distributorChannels, server *rpc.Client) {
+func (client *Client) clientRun(p stubs.Parameters, c clientChannels, server *rpc.Client) {
 	// Input data
 	c.ioCommand <- ioInput
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)

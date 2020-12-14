@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"uk.ac.bris.cs/gameoflife/stubs"
 	"net/rpc"
 )
 
@@ -48,21 +49,24 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	// err = server.Call(, args, reply)
 	handleError(err)
 
-	// r := stubs.Parameters{Turns: p.Turns, Threads: p.Threads, ImageWidth: p.ImageWidth, ImageHeight: p.ImageHeight}
+	r := stubs.Parameters{p.ImageHeight, p.ImageWidth, p.Turns}
 	// Request the initial world and all its parameters
-	// req := new(stubs.Request)
-	// Respond with the final world and all its parameters
-	// res := new(stubs.Response)
-	// server.Call(stubs.Connect, req, res)
+	req := new(stubs.Request)
 
-	// clientChannels := clientChans{
-	// 	events,
-	// 	IoCommand,
-	// 	IoIdle,
-	// 	IoFilename,
-	// 	IoInput,
-	// 	IoOutput,
-	// 	keyPresses,
-	// }
+	// Respond with the final world and all its parameters
+	res := new(stubs.Response)
+	err = server.Call(stubs.NextState, request, response)
+	handleError(err)
+
+
+	clientChannels := clientChans{
+		events,
+		IoCommand,
+		IoIdle,
+		IoFilename,
+		IoInput,
+		IoOutput,
+		keyPresses,
+	}
 	// go clientRun(p, clientChannels, server)
 }
