@@ -20,15 +20,7 @@ type Server struct {
 //TODO:
 // Implement Server
 // Sends a AliveCellsCount event to Client every 2 seconds
-// Kill server
 
-// func (s *Server) AliveCells(args stubs.Default, reply *stubs.Alive) error {
-
-// 	reply.Num = len(s.data.CalculateAliveCells())
-// 	reply.Turn = s.data.currentTurn
-
-// 	return nil
-// }
 
 // beginWorlds starts processing worlds
 func (s *Server) beginWorlds(args stubs.Request, reply *stubs.Default) error {
