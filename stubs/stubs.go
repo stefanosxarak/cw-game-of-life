@@ -1,5 +1,7 @@
 package stubs
 
+var BeginWorlds = "beginWorlds"
+
 var WorldFromServer = "Server.worldFromServer"
 
 var Kill = "Server.Kill"

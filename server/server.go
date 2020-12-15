@@ -40,7 +40,14 @@ func (s *Server) beginWorlds(args stubs.Request, reply *stubs.Default) error {
 		turns:       args.Param.Turns,
 		threads:     args.Param.Threads,
 	}
-	// go s.data.distributor()
+	go s.data.distributor()
+	return nil
+}
+
+// Kill shuts down the server
+func (s *Server) Kill(args stubs.Default, reply *stubs.Parameters) error {
+	s.data.quit = true
+	reply.Turns = s.data.turns
 	return nil
 }
 

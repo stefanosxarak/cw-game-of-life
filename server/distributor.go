@@ -20,6 +20,7 @@ type Data struct {
 	imageWidth  int
 	imageHeight int
 	turns       int
+	quit        bool
 }
 
 //error struct
@@ -27,7 +28,8 @@ type errorString struct {
 	s string
 }
 
-
+const alive = 255
+const dead = 0
 
 func mod(x, m int) int {
 	return (x + m) % m
@@ -86,18 +88,18 @@ func (d *Data) makeNewWorld(height int, width int) {
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
-func (d *Data) distributor(p stubs.Parameters) {
+func (d *Data) distributor() {
 
 	//Initialization
-	d.makeNewWorld(p.ImageHeight, p.ImageWidth)
+	d.makeNewWorld(d.imageHeight, d.imageWidth)
 
 	//Game of Life.
-	var turn int
-	for turn = 0; turn < p.Turns; turn++ {
+	for d.turns = 0; d.turns < d.turns && d.quit == false; d.turns++ {
 
 		//we add the newly updated world to the grid we had made
+		temp := d.world
 		d.world = d.newWorld
-		d.makeNewWorld(p.ImageHeight, p.ImageWidth)
+		d.newWorld = temp
 
 	}
 
