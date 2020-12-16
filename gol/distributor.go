@@ -23,6 +23,8 @@ type errorString struct {
 }
 
 type worker struct {
+	world    [][]uint8
+	newWorld [][]uint8
 	startRow int
 	endRow   int
 }
@@ -58,45 +60,46 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 }
 
 //progress to next state and update CellFlipped event
-func calculateNextState(start int, end int, p Params, world [][]byte, c distributorChannels, turn int) [][]byte {
+func (w *worker) calculateNextState(start int, end int, p Params, world [][]byte, c distributorChannels, turn int) {
 	rows := end - start
-	newWorld := make([][]byte, rows)
-	for i := range newWorld {
-		newWorld[i] = make([]byte, p.ImageWidth)
+	w.newWorld = make([][]uint8, rows)
+	for i := 0; i < rows; i++ {
+		w.newWorld[i] = make([]uint8, p.ImageWidth)
 	}
+
 	i := 0
 	for y := start; y < end; y++ {
 		for x := 0; x < p.ImageWidth; x++ {
 			neighbours := calculateNeighbours(p, x, y, world)
-			if world[y][x] == alive {
+			if w.world[y][x] == alive {
 				if neighbours == 2 || neighbours == 3 {
-					newWorld[i][x] = alive
+					w.newWorld[i][x] = alive
 				} else {
-					newWorld[i][x] = dead
+					w.newWorld[i][x] = dead
 					c.events <- CellFlipped{turn, util.Cell{X: x, Y: y}}
 				}
 			} else {
 				if neighbours == 3 {
-					newWorld[i][x] = alive
+					w.newWorld[i][x] = alive
 					c.events <- CellFlipped{turn, util.Cell{X: x, Y: y}}
 				} else {
-					newWorld[i][x] = dead
+					w.newWorld[i][x] = dead
 				}
 			}
 		}
 		i++
 	}
-	return newWorld
+
 }
 
 //calculateAliveCells function takes the world as input and returns the (x, y) coordinates of all the cells that are alive.
-func calculateAliveCells(p Params, world [][]byte) []util.Cell {
+func (w *worker) calculateAliveCells(p Params) []util.Cell {
 	aliveCells := []util.Cell{}
 
-	for y := 0; y < p.ImageHeight; y++ {
-		for x := 0; x < p.ImageWidth; x++ {
-			if world[y][x] == alive {
-				aliveCells = append(aliveCells, util.Cell{X: x, Y: y})
+	for row := range w.world {
+		for col := range w.world[row] {
+			if w.world[row][col] == alive {
+				aliveCells = append(aliveCells, util.Cell{X: col, Y: row})
 			}
 		}
 	}
@@ -105,24 +108,23 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 }
 
 // creates a grid for the current state of the world
-func makeWorld(height int, width int, c distributorChannels) [][]uint8 {
-	world := make([][]uint8, height)
+func (w *worker) makeWorld(height int, width int, c distributorChannels) {
+	w.world = make([][]uint8, height)
 	for row := 0; row < height; row++ {
-		world[row] = make([]uint8, width)
+		w.world[row] = make([]uint8, width)
 		for cell := 0; cell < width; cell++ {
-			world[row][cell] = <-c.ioInput
+			w.world[row][cell] = <-c.ioInput
 		}
 	}
-	return world
+
 }
 
 //A 2D slice to store the updated world.
-func makeNewWorld(height int, width int) [][]byte {
-	newWorld := make([][]byte, height)
+func (w *worker) makeNewWorld(height int, width int) {
+	w.newWorld = make([][]uint8, height)
 	for row := 0; row < height; row++ {
-		newWorld[row] = make([]byte, width)
+		w.newWorld[row] = make([]uint8, width)
 	}
-	return newWorld
 }
 
 // worker functions
@@ -144,10 +146,10 @@ func (w *worker) createWorkers(p Params) {
 	// return startRow,endRow
 }
 
-func runWorkers(startRow int, endRow int, p Params, turn int, c distributorChannels, world [][]byte, slices chan<- [][]byte) {
+func (w *worker) runWorkers(startRow int, endRow int, p Params, turn int, c distributorChannels, world [][]byte) {
 	// Implement the worker and calculateNextState
-	workerSlice := calculateNextState(startRow, endRow, p, world, c, turn)
-	slices <- workerSlice
+	w.calculateNextState(startRow, endRow, p, world, c, turn)
+
 }
 
 func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
@@ -197,6 +199,7 @@ func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]
 
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
+	w := worker{}
 
 	//Input data
 	c.ioCommand <- ioInput
@@ -204,16 +207,14 @@ func distributor(p Params, c distributorChannels) {
 	c.ioFilename <- imageName
 
 	//Initialization
-	world := makeWorld(p.ImageHeight, p.ImageWidth, c)
-	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
+	w.makeWorld(p.ImageHeight, p.ImageWidth, c)
+	w.makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 	// Start making workers and running them
-	w := worker{}
 	w.createWorkers(p)
-	slices := make(chan [][]byte, p.Threads)
 
 	// A variable to store current alive cells
-	aliveCells := calculateAliveCells(p, newWorld)
+	aliveCells := w.calculateAliveCells(p)
 
 	// For all initially alive cells send a CellFlipped Event.
 	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
@@ -225,31 +226,19 @@ func distributor(p Params, c distributorChannels) {
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
 
 		// newWorld = calculateNextState(p, turn, c, world)
-		aliveCells = calculateAliveCells(p, world)
+		aliveCells = w.calculateAliveCells(p)
 
-		go runWorkers(w.startRow, w.endRow, p, turn, c, newWorld, slices)
-		temp := make([][]byte, 0)
-		for i := 0; i < p.Threads; i++ {
-			part := <-slices
-			temp = append(temp, part...)
-		}
-		for y := 0; y < p.ImageHeight; y++ {
-			for x := 0; x < p.ImageWidth; x++ {
-				// Replace placeholder tempOut[y][x] with the real newWorld[y][x]
-				newWorld[y][x] = temp[y][x]
-			}
-		}
-
+		go w.runWorkers(w.startRow, w.endRow, p, turn, c, w.world)
+		
 		//we add the newly updated world to the grid we had made
-		world = newWorld
-		newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
+		w.world = w.newWorld
+		w.makeNewWorld(p.ImageHeight, p.ImageWidth)
 
-		quit = keyControl(c, p, turn, quit, world)
+		quit = keyControl(c, p, turn, quit, w.world)
 		//ticker
 		select {
 		case <-ticker.C:
 			c.events <- AliveCellsCount{turn, len(aliveCells)}
-
 		default:
 			break
 		}
@@ -262,10 +251,10 @@ func distributor(p Params, c distributorChannels) {
 	ticker.Stop()
 
 	//saves the result to a file
-	saveWorld(c, p, turn, world)
+	saveWorld(c, p, turn, w.world)
 
 	// Make sure that the Io has finished any output before exiting.
-	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
+	c.events <- FinalTurnComplete{turn, w.calculateAliveCells(p)}
 	c.events <- ImageOutputComplete{turn, imageName}
 
 	c.ioCommand <- ioCheckIdle
