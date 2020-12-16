@@ -22,13 +22,6 @@ type errorString struct {
 	s string
 }
 
-// type worker struct {
-// 	world    [][]uint8
-// 	newWorld [][]uint8
-// 	startRow int
-// 	endRow   int
-// }
-
 const alive = 255
 const dead = 0
 
@@ -103,19 +96,6 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 	return aliveCells
 }
 
-// creates a grid for the current state of the world
-func makeWorld(height int, width int, c distributorChannels) [][]uint8 {
-	world := make([][]uint8, height)
-	for row := 0; row < height; row++ {
-		world[row] = make([]uint8, width)
-		for cell := 0; cell < width; cell++ {
-			world[row][cell] = <-c.ioInput
-			c.events <- CellFlipped{0, util.Cell{X: cell, Y: row}}
-		}
-	}
-	return world
-}
-
 //A 2D slice to store the updated world.
 func makeNewWorld(height int, width int) [][]byte {
 	newWorld := make([][]byte, height)
@@ -124,25 +104,6 @@ func makeNewWorld(height int, width int) [][]byte {
 	}
 	return newWorld
 }
-
-// worker functions
-// func (w *worker) createWorkers(p Params) {
-// 	rowsPerWorker := p.ImageHeight / p.Threads
-// 	remaining := p.ImageHeight % p.Threads
-// 	startRow := 0
-// 	for i := 0; i < p.Threads; i++ {
-// 		workerRows := rowsPerWorker
-// 		//adds one of the remaining rows to a worker
-// 		if remaining > 0 {
-// 			workerRows++
-// 			remaining--
-// 		}
-// 		w := worker{}
-// 		w.startRow = startRow
-// 		w.endRow = startRow + workerRows - 1
-// 	}
-	// return startRow,endRow
-// }
 
 func runWorkers(startRow int, endRow int, world [][]byte, p Params,  c distributorChannels, turn int, slice chan<- [][]byte) {
 	// Implement the worker and calculateNextState
@@ -250,9 +211,7 @@ func distributor(p Params, c distributorChannels) {
 					go runWorkers(i*rowsPerWorker, (i+1)*rowsPerWorker, newWorld, p, c, turn, slice[i])
 				}
 			}
-			//we add the newly updated world to the grid we had made
-
-			// A temprorary world to append all the slices to.
+			//We load the slices into a world just to append them together
 			temp := make([][]byte, 0)
 			for i := 0; i < p.Threads; i++ {
 				part := <-slice[i]
@@ -261,20 +220,19 @@ func distributor(p Params, c distributorChannels) {
 
 			for y := 0; y < p.ImageHeight; y++ {
 				for x := 0; x < p.ImageWidth; x++ {
-					// Swap temporary world with the real newWorld[y][x]
+					// Swap temporary world with the real newWorld
 					newWorld[y][x] = temp[y][x]
 				}
 			}
 
 		} else {
-			//if the number of worker threads is one,
-			//give the lone worker the whole image to calculate
+		//When we have 1 thread the worker is going to carry the all burden of the game
 
 			start := 0
 			end := p.ImageHeight
 
 			newWorld = calculateNextState(start, end, p, newWorld, c, turn)
-			c.events <- TurnComplete{CompletedTurns: turn}
+			c.events <- TurnComplete{turn}
 		}
 
 		// world = newWorld
@@ -310,3 +268,8 @@ func distributor(p Params, c distributorChannels) {
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 }
+
+
+/* A byte to byte implementation of workers is easier in theory worse in practice
+yet if we had each world as a uint8 it may seemed easier to work with
+but it was much more difficult to think. */
