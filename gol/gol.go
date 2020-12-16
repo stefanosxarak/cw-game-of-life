@@ -68,18 +68,19 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	srvrAddr := "100.84.31.131:8030"
 	server, err := rpc.Dial("tcp", srvrAddr)
 	handleError(err)
-	// defer server.Close()
+
 	// err = server.Call(, args, reply)
 	// handleError(err)
 
 	r := stubs.Parameters{p.ImageHeight, p.ImageWidth, p.Turns, p.Threads}
+
 	// Request the initial world and all its parameters
 	req := stubs.Request{World: world, Param: r}
 
 	// Respond with the final world and all its parameters
 	res := new(stubs.Response)
 
-	err = server.Call(stubs.BeginWorlds, req, res)
+	err = server.Call(stubs.BeginWorld, req, res)
 	handleError(err)
 
 	go client.clientRun(r, clientChannels, server)

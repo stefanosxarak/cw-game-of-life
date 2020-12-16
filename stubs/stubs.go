@@ -1,6 +1,6 @@
 package stubs
 
-var BeginWorlds = "Server.beginWorld"
+var BeginWorld = "Server.beginWorld"
 
 var WorldFromServer = "Server.worldFromServer"
 

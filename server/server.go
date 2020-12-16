@@ -13,6 +13,8 @@ import (
 // https://golang.org/pkg/net/rpc/ for info about how rpc works
 // https://golang.org/src/runtime/stubs.go for info about how stubs work or check the DS lab
 
+
+// Interface
 type Server struct {
 	data Data
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"uk.ac.bris.cs/gameoflife/stubs"
-
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -31,9 +30,6 @@ type Client struct {
 	quit bool
 }
 
-const alive = 255
-const dead = 0
-
 //error handling for server/client
 func handleError(err error) {
 	if err != nil {
@@ -46,7 +42,7 @@ func calculateAliveCells(p stubs.Parameters, world [][]byte) []util.Cell {
 
 	for y := 0; y < p.ImageHeight; y++ {
 		for x := 0; x < p.ImageWidth; x++ {
-			if world[y][x] == alive {
+			if world[y][x] == 255 {
 				aliveCells = append(aliveCells, util.Cell{X: x, Y: y})
 			}
 		}
@@ -60,9 +56,7 @@ func (client *Client) worldFromServer(server *rpc.Client) (world [][]uint8, turn
 	args := new(stubs.Default)
 	reply := new(stubs.Request)
 	err := server.Call(stubs.WorldFromServer, args, reply)
-	if err != nil {
-		fmt.Println("err", err)
-	}
+	handleError(err)
 	return reply.World, reply.Param.Turns
 }
 
@@ -75,7 +69,7 @@ func (client *Client) killServer(server *rpc.Client) (turn int) {
 	return reply.Param.Turns
 }
 
-// pause game proccessing 
+// pause game proccessing
 func pause(c clientChannels, turn int, x rune) {
 	c.events <- StateChange{turn, Paused}
 	fmt.Println("The current turn is being processed.")
@@ -135,15 +129,8 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 //TODO needs to be safely transfered to server
 func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server *rpc.Client) (turn int) {
 
-	//Initialization
-	// world := makeWorld(p.ImageHeight, p.ImageWidth, c)
-	// newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
-
 	// A variable to store current alive cells
 	aliveCells := make([]util.Cell, 0)
-
-	// For all initially alive cells send a CellFlipped Event.
-	c.events <- CellFlipped{0, util.Cell{X: 0, Y: 0}}
 
 	world, current := client.worldFromServer(server)
 	turn = current
