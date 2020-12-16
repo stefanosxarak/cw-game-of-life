@@ -1,18 +1,5 @@
 package main
 
-import (
-	"uk.ac.bris.cs/gameoflife/stubs"
-)
-
-// type distributorChannels struct {
-// 	events     chan<- Event
-// 	ioCommand  chan<- ioCommand
-// 	ioIdle     <-chan bool
-// 	ioFilename chan<- string
-// 	ioOutput   chan<- uint8
-// 	ioInput    <-chan uint8
-// 	keyPresses <-chan rune
-// }
 type Data struct {
 	world       [][]uint8
 	newWorld    [][]uint8
@@ -36,12 +23,12 @@ func mod(x, m int) int {
 }
 
 //calculateNeighbors takes the current state of the world and completes one evolution of the world. It then returns the result
-func calculateNeighbours(p stubs.Parameters, x, y int, world [][]byte) int {
+func (d *Data) calculateNeighbours(x, y int, world [][]uint8) int {
 	neighbours := 0
 	for i := -1; i <= 1; i++ {
 		for j := -1; j <= 1; j++ {
 			if i != 0 || j != 0 {
-				if world[mod(y+i, p.ImageHeight)][mod(x+j, p.ImageWidth)] == alive {
+				if world[mod(y+i, d.imageHeight)][mod(x+j, d.imageWidth)] == alive {
 					neighbours++
 				}
 			}
@@ -50,34 +37,32 @@ func calculateNeighbours(p stubs.Parameters, x, y int, world [][]byte) int {
 	return neighbours
 }
 
-// //progress to next state and update CellFlipped event
-// func calculateNextState(p stubs.Parameters, turn int, c distributorChannels, world [][]byte) [][]byte {
-// 	newWorld := make([][]byte, p.ImageHeight)
-// 	for i := range newWorld {
-// 		newWorld[i] = make([]byte, p.ImageWidth)
-// 	}
-// 	for y := 0; y < p.ImageHeight; y++ {
-// 		for x := 0; x < p.ImageWidth; x++ {
-// 			neighbours := calculateNeighbours(p, x, y, world)
-// 			if world[y][x] == alive {
-// 				if neighbours == 2 || neighbours == 3 {
-// 					newWorld[y][x] = alive
-// 				} else {
-// 					newWorld[y][x] = dead
-// 					c.events <- CellFlipped{turn, util.Cell{X: x, Y: y}}
-// 				}
-// 			} else {
-// 				if neighbours == 3 {
-// 					newWorld[y][x] = alive
-// 					c.events <- CellFlipped{turn, util.Cell{X: x, Y: y}}
-// 				} else {
-// 					newWorld[y][x] = dead
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return newWorld
-// }
+//progress to next state and update CellFlipped event
+func (d *Data) calculateNextState(world [][]uint8) [][]uint8 {
+	newWorld := make([][]uint8, d.imageHeight)
+	for i := range newWorld {
+		newWorld[i] = make([]uint8, d.imageWidth)
+	}
+	for y := 0; y < d.imageHeight; y++ {
+		for x := 0; x < d.imageWidth; x++ {
+			neighbours := d.calculateNeighbours(x, y, world)
+			if world[y][x] == alive {
+				if neighbours == 2 || neighbours == 3 {
+					newWorld[y][x] = alive
+				} else {
+					newWorld[y][x] = dead
+				}
+			} else {
+				if neighbours == 3 {
+					newWorld[y][x] = alive
+				} else {
+					newWorld[y][x] = dead
+				}
+			}
+		}
+	}
+	return newWorld
+}
 
 //A 2D slice to store the updated world.
 func (d *Data) makeNewWorld(height int, width int) {
@@ -97,10 +82,8 @@ func (d *Data) distributor() {
 	for d.turns = 0; d.turns < d.turns && d.quit == false; d.turns++ {
 
 		//we add the newly updated world to the grid we had made
-		temp := d.world
+		d.newWorld = d.calculateNextState(d.world)
 		d.world = d.newWorld
-		d.newWorld = temp
-
 	}
 
 }

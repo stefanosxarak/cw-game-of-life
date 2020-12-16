@@ -70,7 +70,7 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	handleError(err)
 	// defer server.Close()
 	// err = server.Call(, args, reply)
-	handleError(err)
+	// handleError(err)
 
 	r := stubs.Parameters{p.ImageHeight, p.ImageWidth, p.Turns, p.Threads}
 	// Request the initial world and all its parameters

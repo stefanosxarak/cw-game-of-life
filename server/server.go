@@ -18,14 +18,13 @@ type Server struct {
 }
 
 //TODO:
-// Implement Server
+// fix bug with beginworlds
 // Sends a AliveCellsCount event to Client every 2 seconds
 
 
 // beginWorlds starts processing worlds
-func (s *Server) beginWorlds(args stubs.Request, reply *stubs.Default) error {
+func (s *Server) beginWorld(args stubs.Request, reply *stubs.Default) error {
 	s.data = Data{
-		// currentTurn: 0,
 		world:       args.World,
 		imageHeight: args.Param.ImageHeight,
 		imageWidth:  args.Param.ImageWidth,
@@ -45,7 +44,6 @@ func (s *Server) Kill(args stubs.Default, reply *stubs.Parameters) error {
 
 // Sends a proccessed world from Server
 func (s *Server) worldFromServer(args stubs.Default, reply *stubs.Request) error {
-	// TODO: Take the correct data from distributor
 	reply.World = s.data.world
 	reply.Param.Turns = s.data.turns
 	reply.Param.ImageHeight = s.data.imageHeight
@@ -62,11 +60,10 @@ func main() {
 	flag.Parse()
 
 	// register the Server
-	server := new(Server)
-	rpc.Register(server)
+	rpc.Register(new(Server))
 
 	// Awaiting connection
-	ln, err := net.Listen("tcp", ": "+*portPtr)
+	ln, err := net.Listen("tcp", ": " +*portPtr)
 	if err != nil {
 		panic(err)
 	}

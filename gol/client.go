@@ -75,7 +75,7 @@ func (client *Client) killServer(server *rpc.Client) (turn int) {
 	return reply.Param.Turns
 }
 
-// pause game proccessing and not the server!
+// pause game proccessing 
 func pause(c clientChannels, turn int, x rune) {
 	c.events <- StateChange{turn, Paused}
 	fmt.Println("The current turn is being processed.")
@@ -152,12 +152,6 @@ func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server
 	client.quit = false
 	ticker := time.NewTicker(2 * time.Second)
 	for turn = 0; turn < p.Turns && client.quit == false; turn++ {
-
-		// newWorld = calculateNextState(p, turn, c, world)
-
-		//we add the newly updated world to the grid we had made
-		// world = newWorld
-		// newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 		client.quit = client.keyControl(c, p, turn, client.quit, server)
 
