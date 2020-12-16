@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ChrisGora/semaphore"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -17,14 +16,15 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 	keyPresses <-chan rune
 }
-type worker struct {
-	work  semaphore.Semaphore
-	space semaphore.Semaphore
-}
 
 //error struct
 type errorString struct {
 	s string
+}
+
+type worker struct {
+	startRow int
+	endRow   int
 }
 
 const alive = 255
@@ -58,30 +58,33 @@ func calculateNeighbours(p Params, x, y int, world [][]byte) int {
 }
 
 //progress to next state and update CellFlipped event
-func calculateNextState(p Params, turn int, c distributorChannels, world [][]byte) [][]byte {
-	newWorld := make([][]byte, p.ImageHeight)
+func calculateNextState(start int, end int, p Params, world [][]byte, c distributorChannels, turn int) [][]byte {
+	rows := end - start
+	newWorld := make([][]byte, rows)
 	for i := range newWorld {
 		newWorld[i] = make([]byte, p.ImageWidth)
 	}
-	for y := 0; y < p.ImageHeight; y++ {
+	i := 0
+	for y := start; y < end; y++ {
 		for x := 0; x < p.ImageWidth; x++ {
 			neighbours := calculateNeighbours(p, x, y, world)
 			if world[y][x] == alive {
 				if neighbours == 2 || neighbours == 3 {
-					newWorld[y][x] = alive
+					newWorld[i][x] = alive
 				} else {
-					newWorld[y][x] = dead
+					newWorld[i][x] = dead
 					c.events <- CellFlipped{turn, util.Cell{X: x, Y: y}}
 				}
 			} else {
 				if neighbours == 3 {
-					newWorld[y][x] = alive
+					newWorld[i][x] = alive
 					c.events <- CellFlipped{turn, util.Cell{X: x, Y: y}}
 				} else {
-					newWorld[y][x] = dead
+					newWorld[i][x] = dead
 				}
 			}
 		}
+		i++
 	}
 	return newWorld
 }
@@ -114,43 +117,37 @@ func makeWorld(height int, width int, c distributorChannels) [][]uint8 {
 }
 
 //A 2D slice to store the updated world.
-func makeNewWorld(height int, width int) [][]uint8 {
-	newWorld := make([][]uint8, height)
+func makeNewWorld(height int, width int) [][]byte {
+	newWorld := make([][]byte, height)
 	for row := 0; row < height; row++ {
-		newWorld[row] = make([]uint8, width)
+		newWorld[row] = make([]byte, width)
 	}
 	return newWorld
 }
 
 // worker functions
-func (w *worker) createWorkers(p Params) []worker {
+func (w *worker) createWorkers(p Params) {
 	rowsPerWorker := p.ImageHeight / p.Threads
 	remaining := p.ImageHeight % p.Threads
-	workers := make([]worker, p.Threads)
+	startRow := 0
 	for i := 0; i < p.Threads; i++ {
-		workers[i] = worker{}
 		workerRows := rowsPerWorker
 		//adds one of the remaining rows to a worker
 		if remaining > 0 {
 			workerRows++
 			remaining--
 		}
-		//Semaphores with buffer size 1 so all workers keep up
-		w.work = semaphore.Init(1, 1)
-		w.space = semaphore.Init(1, 0)
-
+		w := worker{}
+		w.startRow = startRow
+		w.endRow = startRow + workerRows - 1
 	}
-	return workers
+	// return startRow,endRow
 }
 
-func (w *worker) runWorkers(p Params, c distributorChannels, world [][]uint8) {
-	//TODO :
+func runWorkers(startRow int, endRow int, p Params, turn int, c distributorChannels, world [][]byte, slices chan<- [][]byte) {
 	// Implement the worker and calculateNextState
-	for turn := 0; ; turn++ {
-		w.work.Wait()
-		// workerSlice := calculateNextState(p, turn, c, world)
-		w.space.Post()
-	}
+	workerSlice := calculateNextState(startRow, endRow, p, world, c, turn)
+	slices <- workerSlice
 }
 
 func saveWorld(c distributorChannels, p Params, turn int, world [][]uint8) {
@@ -211,8 +208,9 @@ func distributor(p Params, c distributorChannels) {
 	newWorld := makeNewWorld(p.ImageHeight, p.ImageWidth)
 
 	// Start making workers and running them
-	// workers := createWorkers(p)
-	// go runWorkers()
+	w := worker{}
+	w.createWorkers(p)
+	slices := make(chan [][]byte, p.Threads)
 
 	// A variable to store current alive cells
 	aliveCells := calculateAliveCells(p, newWorld)
@@ -226,15 +224,15 @@ func distributor(p Params, c distributorChannels) {
 	ticker := time.NewTicker(2 * time.Second)
 	for turn = 0; turn < p.Turns && quit == false; turn++ {
 
-		// fmt.Println(len(aliveCells))
-
-		// Waiting all workers to finish each round
-		// for _, w := range workers {
-		// 	w.space.Wait()
-		// }
-
-		newWorld = calculateNextState(p, turn, c, world)
+		// newWorld = calculateNextState(p, turn, c, world)
 		aliveCells = calculateAliveCells(p, world)
+
+		go runWorkers(w.startRow, w.endRow, p, turn, c, newWorld, slices)
+		temp := make([][]byte, 0)
+		for i := 0; i < p.Threads; i++ {
+			part := <-slices
+			temp = append(temp, part...)
+		}
 
 		//we add the newly updated world to the grid we had made
 		world = newWorld
@@ -252,11 +250,6 @@ func distributor(p Params, c distributorChannels) {
 
 		//update turns
 		c.events <- TurnComplete{turn}
-
-		// Workers to start the next round if no q is pressed
-		// for i := 0; i < p.Threads && quit == false; i++ {
-		// 		workers[j].work.Post()
-		// }
 
 	}
 	//terminate ticker
