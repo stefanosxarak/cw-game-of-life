@@ -233,6 +233,12 @@ func distributor(p Params, c distributorChannels) {
 			part := <-slices
 			temp = append(temp, part...)
 		}
+		for y := 0; y < p.ImageHeight; y++ {
+			for x := 0; x < p.ImageWidth; x++ {
+				// Replace placeholder tempOut[y][x] with the real newWorld[y][x]
+				newWorld[y][x] = temp[y][x]
+			}
+		}
 
 		//we add the newly updated world to the grid we had made
 		world = newWorld
