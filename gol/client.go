@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"time"
 
 	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -32,12 +33,11 @@ func handleError(err error) {
 }
 
 // recieve alive cells from server
-func (client *Client) alive(p Params, server *rpc.Client, c clientChannels) (turn int) {
+func (client *Client) alive(p stubs.Parameters, server *rpc.Client, c clientChannels) {
 	args := new(stubs.Default)
 	reply := new(stubs.AliveCell)
 	server.Call(stubs.AliveCells, args, reply)
 	c.events <- AliveCellsCount{reply.Turn, reply.Num}
-	return reply.Turn
 }
 
 // Gets a proccessed world from server
@@ -127,20 +127,32 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 	return client.quit
 }
 
-//TODO needs to be safely transfered to server
+//Client runs the game from the server
 func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server *rpc.Client) (turn int) {
 
 	world := client.worldFromServer(server)
 
 	//Game of Life.
 	client.quit = false
-
+	ticker := time.NewTicker(2 * time.Second)
 	for turn := 0; turn < p.Turns && client.quit == false; turn++ {
 		client.quit = client.keyControl(c, p, turn, client.quit, server)
 		world = client.worldFromServer(server)
+
+		//ticker
+		select {
+		case <-ticker.C:
+			client.alive(p, server, c)
+		default:
+			break
+		}
+
 		//update events
 		c.events <- TurnComplete{turn}
 	}
+	//terminate ticker
+	ticker.Stop()
+
 	c.events <- FinalTurnComplete{turn, calculateAlive(world)}
 
 	//saves the result to a file

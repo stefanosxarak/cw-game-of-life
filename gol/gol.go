@@ -69,9 +69,6 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	server, err := rpc.Dial("tcp", srvrAddr)
 	handleError(err)
 
-	// err = server.Call(, args, reply)
-	// handleError(err)
-
 	r := stubs.Parameters{p.ImageHeight, p.ImageWidth, p.Turns, p.Threads}
 
 	// Request the initial world and all its parameters

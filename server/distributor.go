@@ -102,5 +102,6 @@ func (d *Data) distributor() {
 		//we add the newly updated world to the grid we had made
 		d.newWorld = d.calculateNextState(d.world)
 		d.world = d.newWorld
+
 	}
 }
