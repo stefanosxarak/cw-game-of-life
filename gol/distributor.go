@@ -96,7 +96,7 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 	return aliveCells
 }
 
-//A 2D slice to store the updated world.
+//A 2D slice to store the world.
 func makeNewWorld(height int, width int) [][]byte {
 	newWorld := make([][]byte, height)
 	for row := 0; row < height; row++ {
@@ -106,7 +106,6 @@ func makeNewWorld(height int, width int) [][]byte {
 }
 
 func runWorkers(startRow int, endRow int, world [][]byte, p Params,  c distributorChannels, turn int, slice chan<- [][]byte) {
-	// Implement the worker and calculateNextState
 	worldPart := calculateNextState(startRow, endRow, p, world, c, turn)
 	slice <- worldPart
 }
@@ -136,7 +135,7 @@ func pause(c distributorChannels, turn int, x rune) {
 
 // Button control
 func keyControl(c distributorChannels, p Params, turn int, quit bool, world [][]uint8) bool {
-	//s to save, q to quit, p to pause/unpause, k to stop all comms with server
+	//s to save, q to quit, p to pause/unpause
 	select {
 	case x := <-c.keyPresses:
 		if x == 's' {
@@ -207,7 +206,7 @@ func distributor(p Params, c distributorChannels) {
 				//if the current thread is the last one, give it the remaining lines to calculate
 				if (remaining > 0) && ((i + 1) == p.Threads) {
 					go runWorkers(i*rowsPerWorker, ((i+1)*rowsPerWorker)+remaining, newWorld, p, c, turn, slice[i])
-				} else { //else, just give each thread the appointed rowsPerWorker
+				} else { 
 					go runWorkers(i*rowsPerWorker, (i+1)*rowsPerWorker, newWorld, p, c, turn, slice[i])
 				}
 			}
@@ -235,10 +234,8 @@ func distributor(p Params, c distributorChannels) {
 			c.events <- TurnComplete{turn}
 		}
 
-		// world = newWorld
-		// newWorld = makeNewWorld(p.ImageHeight, p.ImageWidth)
-
 		quit = keyControl(c, p, turn, quit, newWorld)
+
 		//ticker
 		select {
 		case <-ticker.C:
@@ -268,8 +265,3 @@ func distributor(p Params, c distributorChannels) {
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 }
-
-
-/* A byte to byte implementation of workers is easier in theory worse in practice
-yet if we had each world as a uint8 it may seemed easier to work with
-but it was much more difficult to think. */
