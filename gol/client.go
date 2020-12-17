@@ -41,12 +41,12 @@ func (client *Client) alive(p Params, server *rpc.Client, c clientChannels) (tur
 }
 
 // Gets a proccessed world from server
-func (client *Client) worldFromServer(server *rpc.Client) (world [][]uint8, turn int) {
+func (client *Client) worldFromServer(server *rpc.Client) [][]uint8 {
 	args := new(stubs.Default)
 	reply := new(stubs.Request)
 	err := server.Call(stubs.WorldFromServer, args, reply)
 	handleError(err)
-	return reply.World, reply.Param.Turns
+	return reply.World
 }
 
 // Terminate contact with server
@@ -70,6 +70,7 @@ func pause(c clientChannels, turn int, x rune) {
 	c.events <- StateChange{turn, Executing}
 }
 
+// Save game and continue playing
 func saveWorld(c clientChannels, p stubs.Parameters, turn int, world [][]uint8) {
 	c.ioCommand <- ioOutput
 	outputFilename := fmt.Sprintf("%vx%vx%v", p.ImageWidth, p.ImageHeight, turn)
@@ -102,8 +103,7 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 	case x := <-c.keyPresses:
 		if x == 's' {
 			fmt.Println("Saving...")
-			world, current := client.worldFromServer(server)
-			turn = current
+			world := client.worldFromServer(server)
 			saveWorld(c, p, turn, world)
 		} else if x == 'q' {
 			client.quit = true
@@ -113,8 +113,7 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 
 		} else if x == 'k' {
 			fmt.Println("Contact with server ceases to exist...")
-			world, current := client.worldFromServer(server)
-			turn = current
+			world := client.worldFromServer(server)
 			client.quit = true
 			saveWorld(c, p, turn, world)
 			c.events <- StateChange{turn, Quitting}
@@ -131,16 +130,14 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 //TODO needs to be safely transfered to server
 func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server *rpc.Client) (turn int) {
 
-	world, current := client.worldFromServer(server)
-	turn = current
+	world := client.worldFromServer(server)
 
 	//Game of Life.
 	client.quit = false
 
-	for turn = 0; turn < p.Turns && client.quit == false; turn++ {
-
+	for turn := 0; turn < p.Turns && client.quit == false; turn++ {
 		client.quit = client.keyControl(c, p, turn, client.quit, server)
-
+		world = client.worldFromServer(server)
 		//update events
 		c.events <- TurnComplete{turn}
 	}

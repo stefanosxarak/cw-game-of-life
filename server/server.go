@@ -45,7 +45,7 @@ func (s *Server) Kill(args stubs.Default, reply *stubs.Parameters) error {
 // Sends a proccessed world from Server
 func (s *Server) WorldFromServer(args stubs.Default, reply *stubs.Request) error {
 	reply.World = s.data.world
-	reply.Param.Turns = s.data.turns
+	// reply.Param.Turns = s.data.turns
 	reply.Param.ImageHeight = s.data.imageHeight
 	reply.Param.ImageWidth = s.data.imageWidth
 
