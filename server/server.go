@@ -13,7 +13,6 @@ import (
 // https://golang.org/pkg/net/rpc/ for info about how rpc works
 // https://golang.org/src/runtime/stubs.go for info about how stubs work or check the DS lab
 
-
 // Interface
 type Server struct {
 	data Data
@@ -23,9 +22,8 @@ type Server struct {
 // fix bug with beginworlds
 // Sends a AliveCellsCount event to Client every 2 seconds
 
-
 // beginWorlds starts processing worlds
-func (s *Server) beginWorld(args stubs.Request, reply *stubs.Default) error {
+func (s *Server) BeginWorld(args stubs.Request, reply *stubs.Default) error {
 	s.data = Data{
 		world:       args.World,
 		imageHeight: args.Param.ImageHeight,
@@ -45,12 +43,19 @@ func (s *Server) Kill(args stubs.Default, reply *stubs.Parameters) error {
 }
 
 // Sends a proccessed world from Server
-func (s *Server) worldFromServer(args stubs.Default, reply *stubs.Request) error {
+func (s *Server) WorldFromServer(args stubs.Default, reply *stubs.Request) error {
 	reply.World = s.data.world
 	reply.Param.Turns = s.data.turns
 	reply.Param.ImageHeight = s.data.imageHeight
 	reply.Param.ImageWidth = s.data.imageWidth
 
+	return nil
+}
+
+// GetNumAlive returns the number of alive cells and current turn
+func (s *Server) AliveCells(args stubs.Default, reply *stubs.AliveCell) error {
+	reply.Num = len(s.data.calculateAliveCells())
+	reply.Turn = s.data.turns
 	return nil
 }
 
@@ -65,7 +70,7 @@ func main() {
 	rpc.Register(new(Server))
 
 	// Awaiting connection
-	ln, err := net.Listen("tcp", ": " +*portPtr)
+	ln, err := net.Listen("tcp", ": "+*portPtr)
 	if err != nil {
 		panic(err)
 	}

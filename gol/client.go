@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
-	"time"
 
 	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -20,12 +19,7 @@ type clientChannels struct {
 	keyPresses <-chan rune
 }
 
-//TODO:
-// Implement a basic controller which can tell the logic engine to evolve Game of Life for the number of turns
-// keyControl
-// Implement key k at keyControl
-// stubs
-
+// struct to contain quit and other variables
 type Client struct {
 	quit bool
 }
@@ -37,18 +31,13 @@ func handleError(err error) {
 	}
 }
 
-func calculateAliveCells(p stubs.Parameters, world [][]byte) []util.Cell {
-	aliveCells := []util.Cell{}
-
-	for y := 0; y < p.ImageHeight; y++ {
-		for x := 0; x < p.ImageWidth; x++ {
-			if world[y][x] == 255 {
-				aliveCells = append(aliveCells, util.Cell{X: x, Y: y})
-			}
-		}
-	}
-
-	return aliveCells
+// recieve alive cells from server
+func (client *Client) alive(p Params, server *rpc.Client, c clientChannels) (turn int) {
+	args := new(stubs.Default)
+	reply := new(stubs.AliveCell)
+	server.Call(stubs.AliveCells, args, reply)
+	c.events <- AliveCellsCount{reply.Turn, reply.Num}
+	return reply.Turn
 }
 
 // Gets a proccessed world from server
@@ -94,6 +83,19 @@ func saveWorld(c clientChannels, p stubs.Parameters, turn int, world [][]uint8) 
 	c.events <- ImageOutputComplete{turn, outputFilename}
 }
 
+// calculate alivecells for client
+func calculateAlive(world [][]uint8) []util.Cell {
+	aliveCells := make([]util.Cell, 0)
+	for row := range world {
+		for col := range world[row] {
+			if world[row][col] == 255 {
+				aliveCells = append(aliveCells, util.Cell{X: col, Y: row})
+			}
+		}
+	}
+	return aliveCells
+}
+
 func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int, quit bool, server *rpc.Client) bool {
 	//s to save, q to client.quit, p to pause/unpause, k to stop all comms with server
 	select {
@@ -129,36 +131,20 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 //TODO needs to be safely transfered to server
 func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server *rpc.Client) (turn int) {
 
-	// A variable to store current alive cells
-	aliveCells := make([]util.Cell, 0)
-
 	world, current := client.worldFromServer(server)
 	turn = current
 
 	//Game of Life.
 	client.quit = false
-	ticker := time.NewTicker(2 * time.Second)
+
 	for turn = 0; turn < p.Turns && client.quit == false; turn++ {
 
 		client.quit = client.keyControl(c, p, turn, client.quit, server)
 
-		//ticker
-		select {
-		case <-ticker.C:
-			aliveCells = calculateAliveCells(p, world)
-			c.events <- AliveCellsCount{turn, len(aliveCells)}
-
-		default:
-			break
-		}
-
 		//update events
 		c.events <- TurnComplete{turn}
-
 	}
-	//terminate ticker
-	ticker.Stop()
-	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, world)}
+	c.events <- FinalTurnComplete{turn, calculateAlive(world)}
 
 	//saves the result to a file
 	saveWorld(c, p, turn, world)

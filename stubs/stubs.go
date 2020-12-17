@@ -1,8 +1,10 @@
 package stubs
 
-var BeginWorld = "Server.beginWorld"
+var BeginWorld = "Server.BeginWorld"
 
-var WorldFromServer = "Server.worldFromServer"
+var AliveCells = "Server.AliveCells"
+
+var WorldFromServer = "Server.WorldFromServer"
 
 var Kill = "Server.Kill"
 
@@ -24,4 +26,10 @@ type Parameters struct {
 	ImageWidth  int
 	Turns       int
 	Threads     int
+}
+
+// Alive contains the number of alive cells
+type AliveCell struct {
+	Num  int
+	Turn int
 }

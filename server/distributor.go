@@ -1,5 +1,12 @@
 package main
 
+import (
+	"time"
+
+	"uk.ac.bris.cs/gameoflife/stubs"
+	"uk.ac.bris.cs/gameoflife/util"
+)
+
 type Data struct {
 	world       [][]uint8
 	newWorld    [][]uint8
@@ -64,6 +71,21 @@ func (d *Data) calculateNextState(world [][]uint8) [][]uint8 {
 	return newWorld
 }
 
+// returns a slice of the alive cells in prevWorld
+// Could not add parameters as server gets complicated
+func (d *Data)calculateAliveCells() []util.Cell {
+	aliveCells := make([]util.Cell, 0)
+	for row := range d.world {
+		for col := range d.world[row] {
+			if d.world[row][col] == alive {
+				aliveCells = append(aliveCells, util.Cell{X: col, Y: row})
+			}
+		}
+	}
+	return aliveCells
+}
+
+
 //A 2D slice to store the updated world.
 func (d *Data) makeNewWorld(height int, width int) {
 	d.newWorld = make([][]uint8, height)
@@ -79,11 +101,23 @@ func (d *Data) distributor() {
 	d.makeNewWorld(d.imageHeight, d.imageWidth)
 
 	//Game of Life.
+	ticker := time.NewTicker(2 * time.Second)
 	for d.turns = 0; d.turns < d.turns && d.quit == false; d.turns++ {
 
 		//we add the newly updated world to the grid we had made
 		d.newWorld = d.calculateNextState(d.world)
 		d.world = d.newWorld
+
+		//ticker
+		// select {
+		// case <-ticker.C:
+		// 	aliveCells = calculateAliveCells(p, world)
+		// 	c.events <- AliveCellsCount{turn, len(aliveCells)}
+		// default:
+		// 	break
+		// }
 	}
+	//terminate ticker
+	ticker.Stop()
 
 }
