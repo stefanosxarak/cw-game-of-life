@@ -51,6 +51,7 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	imageName := fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
 	IoFilename <- imageName
 
+	// pass the input to the world
 	world := makeWorld(IoInput, p.ImageWidth, p.ImageHeight)
 
 	clientChannels := clientChannels{
@@ -72,7 +73,7 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	r := stubs.Parameters{p.ImageHeight, p.ImageWidth, p.Turns, p.Threads}
 
 	// Request the initial world and all its parameters
-	req := stubs.Request{World: world, Param: r}
+	req := stubs.Request{world, r}
 
 	// Respond with the final world and all its parameters
 	res := new(stubs.Response)

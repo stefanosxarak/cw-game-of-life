@@ -112,7 +112,7 @@ func (client *Client) keyControl(c clientChannels, p stubs.Parameters, turn int,
 			pause(c, turn, x)
 
 		} else if x == 'k' {
-			fmt.Println("Contact with server ceases to exist...")
+			fmt.Println("Contact with server ceases...")
 			world := client.worldFromServer(server)
 			client.quit = true
 			saveWorld(c, p, turn, world)
