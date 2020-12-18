@@ -18,17 +18,14 @@ type Server struct {
 	data Data
 }
 
-//TODO:
-// fix bug with beginworlds
-// Sends a AliveCellsCount event to Client every 2 seconds
-
 // beginWorlds starts processing worlds
 func (s *Server) BeginWorld(args stubs.Request, reply *stubs.Default) error {
 	s.data = Data{
+		turns:       0,
 		world:       args.World,
 		imageHeight: args.Param.ImageHeight,
 		imageWidth:  args.Param.ImageWidth,
-		turns:       args.Param.Turns,
+		totalTurns:  args.Param.Turns,
 		threads:     args.Param.Threads,
 	}
 	go s.data.distributor()
@@ -55,7 +52,7 @@ func (s *Server) WorldFromServer(args stubs.Default, reply *stubs.Request) error
 // GetNumAlive returns the number of alive cells and current turn
 func (s *Server) AliveCells(args stubs.Default, reply *stubs.AliveCell) error {
 	reply.Num = len(s.data.calculateAliveCells())
-	reply.Turn = s.data.turns
+	reply.Turns = s.data.turns
 	return nil
 }
 

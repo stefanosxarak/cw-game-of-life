@@ -31,5 +31,5 @@ type Parameters struct {
 // Alive contains the number of alive cells
 type AliveCell struct {
 	Num  int
-	Turn int
+	Turns int
 }

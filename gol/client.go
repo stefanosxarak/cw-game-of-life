@@ -33,11 +33,11 @@ func handleError(err error) {
 }
 
 // recieve alive cells from server
-func (client *Client) alive(p stubs.Parameters, server *rpc.Client, c clientChannels) {
+func (client *Client) alive(server *rpc.Client, c clientChannels) {
 	args := new(stubs.Default)
 	reply := new(stubs.AliveCell)
 	server.Call(stubs.AliveCells, args, reply)
-	c.events <- AliveCellsCount{reply.Turn, reply.Num}
+	c.events <- AliveCellsCount{reply.Turns, reply.Num}
 }
 
 // Gets a proccessed world from server
@@ -142,7 +142,7 @@ func (client *Client) gameExecution(c clientChannels, p stubs.Parameters, server
 		//ticker
 		select {
 		case <-ticker.C:
-			client.alive(p, server, c)
+			client.alive(server, c)
 		default:
 			break
 		}
