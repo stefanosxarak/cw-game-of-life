@@ -66,7 +66,7 @@ func Run(p Params, events chan<- Event, keyPresses <-chan rune) {
 	client := Client{}
 
 	// Establish contact with the server
-	srvrAddr := "100.84.31.131:8030"
+	srvrAddr := "100.84.31.136:8030"
 	server, err := rpc.Dial("tcp", srvrAddr)
 	handleError(err)
 
